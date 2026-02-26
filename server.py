@@ -330,6 +330,34 @@ def build_dashboard_prompt(data):
         f"Fallbacks: {', '.join(ac.get('fallbacks', [])) or 'none'}",
     ]
 
+    # Task board context from NocoDB
+    try:
+        kb = fetch_kanban_data()
+        if "error" not in kb:
+            st = kb.get("stats", {})
+            cols = kb.get("columns", {})
+            total = sum(len(v) for v in cols.values())
+            lines += ["", f"=== TASK BOARD ({total} tasks) ==="]
+            lines.append(
+                f"Active: {st.get('active', 0)} | "
+                f"Completed today: {st.get('completed_today', 0)} | "
+                f"Avg completion: {st.get('avg_completion_minutes', 0)}min"
+            )
+            agents = st.get("agent_counts", {})
+            if agents:
+                lines.append("By agent: " + ", ".join(
+                    f"{a}({n})" for a, n in agents.items()
+                ))
+            for status in ("in_progress", "queued", "review", "failed", "escalated"):
+                for card in cols.get(status, []):
+                    lines.append(
+                        f"  [{status}] {card.get('title', '?')} "
+                        f"(agent: {card.get('agent', '?')}, "
+                        f"priority: {card.get('priority', '?')})"
+                    )
+    except Exception:
+        pass
+
     return "\n".join(lines)
 
 

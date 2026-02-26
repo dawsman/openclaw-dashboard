@@ -27,11 +27,15 @@ import json, glob, os, sys, subprocess, time
 import re as _re
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+try:
+    from zoneinfo import ZoneInfo
+    local_tz = ZoneInfo('Europe/London')
+except ImportError:
+    local_tz = timezone(timedelta(hours=0))
 
 dashboard_dir = sys.argv[1]
 openclaw_path = sys.argv[2]
 
-local_tz = timezone(timedelta(hours=8))  # GMT+8
 now = datetime.now(local_tz)
 today_str = now.strftime('%Y-%m-%d')
 
@@ -596,6 +600,7 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
 
                     name = model_name(model)
                     cost_total = usage.get('cost',{}).get('total',0) if isinstance(usage.get('cost'),dict) else 0
+                    if cost_total < 0: cost_total = 0  # Skip corrupted negative costs
                     inp = usage.get('input',0)
                     out = usage.get('output',0)
                     cr = usage.get('cacheRead',0)
@@ -808,7 +813,7 @@ else:
 output = {
     'botName': bot_name,
     'botEmoji': bot_emoji,
-    'lastRefresh': now.strftime('%Y-%m-%d %H:%M:%S GMT+8'),
+    'lastRefresh': now.strftime('%Y-%m-%d %H:%M:%S %Z'),
     'lastRefreshMs': int(now.timestamp() * 1000),
 
     # Gateway health
