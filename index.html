@@ -1314,7 +1314,7 @@ function renderKanbanCard(c){
   const borderColors={critical:'#ef4444',high:'#f97316',normal:'#facc15',low:'#737373'};
   const borderColor=borderColors[(c.priority||'normal').toLowerCase()]||'#facc15';
   return `<div class="kanban-card" style="--card-accent:${borderColor}" onclick="openKanbanModal(${c.id})">
-    <div class="kanban-card-title" title="${(c.title||'').replace(/"/g,'&quot;')}">${c.title||'—'}</div>
+    <div class="kanban-card-title" title="${esc(c.title||'')}">${esc(c.title||'—')}</div>
     <div class="kanban-card-meta">
       <span class="kanban-card-agent ${agentCls}">${agentLabel}</span>
       <span class="kanban-card-priority ${priCls}"></span>
@@ -1353,7 +1353,7 @@ async function openKanbanModal(taskId){
   ].filter(([,v])=>v);
   content.innerHTML=`<div class="kanban-modal-title">${card.title||'Task'}</div>`+
     fields.map(([label,value])=>
-      `<div class="kanban-modal-field"><div class="kanban-modal-label">${label}</div><div class="kanban-modal-value">${String(value).replace(/</g,'&lt;')}</div></div>`
+      `<div class="kanban-modal-field"><div class="kanban-modal-label">${esc(label)}</div><div class="kanban-modal-value">${esc(value)}</div></div>`
     ).join('');
 }
 
