@@ -75,7 +75,48 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .donut-legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap}
 .donut-legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 
-/* Kanban removed */
+/* Kanban board */
+.kanban-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.kanban-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.kanban-stats{display:flex;gap:16px;font-size:12px;color:var(--muted)}
+.kanban-stats span{display:flex;align-items:center;gap:4px}
+.kanban-stats .ks-val{color:var(--textStrong);font-weight:600}
+.kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;margin-bottom:24px}
+.kanban-col{min-width:200px;max-width:240px;flex:1}
+.kanban-col-header{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:8px 10px;display:flex;justify-content:space-between;align-items:center}
+.kanban-col-count{background:var(--surface);padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;color:var(--muted)}
+.kanban-col-body{display:flex;flex-direction:column;gap:6px;min-height:60px}
+.kanban-card{padding:10px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--card-accent,var(--accent));cursor:pointer;transition:background .15s}
+.kanban-card:hover{background:var(--surfaceHover)}
+.kanban-card-title{font-size:12px;font-weight:600;color:var(--textStrong);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kanban-card-meta{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.kanban-card-agent{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;white-space:nowrap}
+.kanban-card-agent.a-holly{background:rgba(245,158,11,.12);color:#f59e0b}
+.kanban-card-agent.a-forge{background:rgba(59,130,246,.12);color:#3b82f6}
+.kanban-card-agent.a-steward{background:rgba(34,197,94,.12);color:#22c55e}
+.kanban-card-agent.a-archie{background:rgba(168,85,247,.12);color:#a855f7}
+.kanban-card-agent.a-gears{background:rgba(249,115,22,.12);color:#f97316}
+.kanban-card-agent.a-ink{background:rgba(20,184,166,.12);color:#14b8a6}
+.kanban-card-agent.a-scout{background:rgba(239,68,68,.12);color:#ef4444}
+.kanban-card-agent.a-other{background:var(--tableBg);color:var(--dim)}
+.kanban-card-priority{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.kanban-card-priority.p-critical{background:#ef4444}
+.kanban-card-priority.p-high{background:#f97316}
+.kanban-card-priority.p-normal{background:#facc15}
+.kanban-card-priority.p-low{background:#737373}
+.kanban-card-time{font-size:10px;color:var(--dim);margin-left:auto}
+.kanban-card-source{font-size:10px}
+.kanban-card-attempts{font-size:9px;color:var(--red);font-weight:600}
+.kanban-card-subtasks{width:100%;height:4px;background:var(--tableBg);border-radius:2px;margin-top:6px;overflow:hidden}
+.kanban-card-subtasks-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+.kanban-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
+.kanban-modal-overlay.open{display:flex}
+.kanban-modal{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;max-width:560px;width:90vw;max-height:80vh;overflow-y:auto}
+.kanban-modal-title{font-size:16px;font-weight:700;color:var(--textStrong);margin-bottom:12px}
+.kanban-modal-field{margin-bottom:10px}
+.kanban-modal-label{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.kanban-modal-value{font-size:12px;color:var(--text);white-space:pre-wrap}
+.kanban-modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
 
 /* Section header */
 .section-header{display:flex;align-items:center;justify-content:space-between;padding:0 4px;margin-bottom:10px;flex-wrap:wrap;gap:8px}
@@ -283,6 +324,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
   </div>
 </div>
 
+
+<!-- 4b. Kanban Task Board -->
+<div style="margin-bottom:24px" id="kanbanSection">
+  <div class="kanban-header">
+    <span class="kanban-title">📋 Task Board</span>
+    <div class="kanban-stats" id="kanbanStats"></div>
+  </div>
+  <div class="kanban-board" id="kanbanBoard">
+    <div class="kanban-col" id="kColBacklog"><div class="kanban-col-header">Backlog <span class="kanban-col-count" id="kCntBacklog">0</span></div><div class="kanban-col-body" id="kBodyBacklog"></div></div>
+    <div class="kanban-col" id="kColQueued"><div class="kanban-col-header">Queued <span class="kanban-col-count" id="kCntQueued">0</span></div><div class="kanban-col-body" id="kBodyQueued"></div></div>
+    <div class="kanban-col" id="kColInProgress"><div class="kanban-col-header">In Progress <span class="kanban-col-count" id="kCntInProgress">0</span></div><div class="kanban-col-body" id="kBodyInProgress"></div></div>
+    <div class="kanban-col" id="kColReview"><div class="kanban-col-header">Review <span class="kanban-col-count" id="kCntReview">0</span></div><div class="kanban-col-body" id="kBodyReview"></div></div>
+    <div class="kanban-col" id="kColDone"><div class="kanban-col-header">Done <span class="kanban-col-count" id="kCntDone">0</span></div><div class="kanban-col-body" id="kBodyDone"></div></div>
+    <div class="kanban-col" id="kColFailed"><div class="kanban-col-header">Failed <span class="kanban-col-count" id="kCntFailed">0</span></div><div class="kanban-col-body" id="kBodyFailed"></div></div>
+    <div class="kanban-col" id="kColEscalated"><div class="kanban-col-header">Escalated <span class="kanban-col-count" id="kCntEscalated">0</span></div><div class="kanban-col-body" id="kBodyEscalated"></div></div>
+  </div>
+</div>
+
+<!-- Kanban detail modal -->
+<div class="kanban-modal-overlay" id="kanbanModal" onclick="if(event.target===this)closeKanbanModal()">
+  <div class="kanban-modal" style="position:relative">
+    <button class="kanban-modal-close" onclick="closeKanbanModal()">✕</button>
+    <div id="kanbanModalContent"></div>
+  </div>
+</div>
 
 <!-- 5. Charts Section -->
 <div class="charts-section">
@@ -576,6 +642,13 @@ loadThemes();
 // ── Dashboard ──
 let D={},prevD=null,prevChartDays=null,prevUTab=null,prevSrTab=null,prevStTab=null,uTab='today',srTab='today',stTab='today',timer=60;
 const COLORS=['#6366f1','#9333ea','#ec4899','#f59e0b','#10b981','#06b6d4','#f87171','#84cc16'];
+
+// ── Kanban Board ──
+const AGENT_EMOJI={holly:'⚡',forge:'🔨',steward:'📦',archie:'📚',gears:'⚙️',ink:'🖊️',scout:'🔎',gaffer:'⚽',adsmith:'📊',taskmaster:'📋'};
+const AGENT_CLASS={holly:'a-holly',forge:'a-forge',steward:'a-steward',archie:'a-archie',gears:'a-gears',ink:'a-ink',scout:'a-scout'};
+const SOURCE_ICON={user:'👤',alert:'🚨',cron:'⏰',heartbeat:'💓',self:'🤖'};
+const KANBAN_COLS=['backlog','queued','in_progress','review','done','failed','escalated'];
+let kanbanData=null;
 const $=id=>document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 function safeColor(v){
@@ -617,6 +690,7 @@ async function loadData(){
     requestAnimationFrame(() => render());
     $('lastUpdate').textContent='Updated: '+new Date().toLocaleTimeString();
     timer=60;
+    loadKanban();
   }catch(e){
     $('alertsSection').innerHTML='<div class="alert-item alert-critical"><span class="alert-icon">⚠️</span><span class="alert-msg">Failed to load data.json</span></div>';
   }
@@ -1196,6 +1270,94 @@ function renderSubagentChart(id,data){
   const xLabels=data.map((d,i)=>i%nth===0?`<text x="${P.l+i*(barW+gap)+gap/2+barW/2}" y="${H-P.b+16}" text-anchor="middle" fill="var(--dim)" font-size="9">${esc(d.label)}</text>`:'').join('');
   $(id).innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:350px">${yL}${yR}${xLabels}${bars}<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}</svg><div class="chart-legend"><span class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--purple)"></span>Runs</span><span class="chart-legend-item"><span class="chart-legend-dot" style="background:var(--accent)"></span>Cost</span></div>`;
 }
+
+// ── Kanban Functions ──
+async function loadKanban(){
+  try{
+    const r=await fetch('/api/kanban');
+    if(!r.ok)return;
+    kanbanData=await r.json();
+    renderKanban();
+  }catch(e){console.warn('kanban fetch failed:',e)}
+}
+
+function renderKanban(){
+  if(!kanbanData||kanbanData.error)return;
+  const{columns,stats}=kanbanData;
+  const agentStr=Object.entries(stats.agent_counts||{}).map(([a,n])=>`${AGENT_EMOJI[a]||''}${a}(${n})`).join(' ');
+  document.getElementById('kanbanStats').innerHTML=
+    `<span>Active: <span class="ks-val">${stats.active}</span></span>`+
+    `<span>Today: <span class="ks-val">${stats.completed_today} done</span></span>`+
+    `<span>Avg: <span class="ks-val">${stats.avg_completion_minutes}min</span></span>`+
+    (agentStr?`<span>Agents: <span class="ks-val">${agentStr}</span></span>`:'');
+  for(const col of KANBAN_COLS){
+    const cards=columns[col]||[];
+    const cap=col==='in_progress'?'InProgress':col.charAt(0).toUpperCase()+col.slice(1);
+    const countEl=document.getElementById('kCnt'+cap);
+    const bodyEl=document.getElementById('kBody'+cap);
+    if(countEl)countEl.textContent=cards.length;
+    if(!bodyEl)continue;
+    bodyEl.innerHTML=cards.map(c=>renderKanbanCard(c)).join('');
+  }
+}
+
+function renderKanbanCard(c){
+  const agent=(c.agent||'').toLowerCase();
+  const agentCls=AGENT_CLASS[agent]||'a-other';
+  const agentLabel=`${AGENT_EMOJI[agent]||''} ${c.agent||'—'}`;
+  const priCls='p-'+(c.priority||'normal').toLowerCase();
+  const sourceIcon=SOURCE_ICON[(c.source||'').toLowerCase()]||'';
+  let timeStr='';
+  if(c.status==='done'&&c.actual_minutes!=null){timeStr=`✓ ${c.actual_minutes}min`}
+  else if(c.estimated_minutes!=null){timeStr=`⏱ ~${c.estimated_minutes}min`}
+  const attemptsStr=(c.attempts&&c.attempts>1)?`<span class="kanban-card-attempts">attempt ${c.attempts}/${c.max_attempts||3}</span>`:'';
+  const borderColors={critical:'#ef4444',high:'#f97316',normal:'#facc15',low:'#737373'};
+  const borderColor=borderColors[(c.priority||'normal').toLowerCase()]||'#facc15';
+  return `<div class="kanban-card" style="--card-accent:${borderColor}" onclick="openKanbanModal(${c.id})">
+    <div class="kanban-card-title" title="${(c.title||'').replace(/"/g,'&quot;')}">${c.title||'—'}</div>
+    <div class="kanban-card-meta">
+      <span class="kanban-card-agent ${agentCls}">${agentLabel}</span>
+      <span class="kanban-card-priority ${priCls}"></span>
+      ${sourceIcon?`<span class="kanban-card-source">${sourceIcon}</span>`:''}
+      ${attemptsStr}
+      <span class="kanban-card-time">${timeStr}</span>
+    </div>
+  </div>`;
+}
+
+async function openKanbanModal(taskId){
+  const modal=document.getElementById('kanbanModal');
+  const content=document.getElementById('kanbanModalContent');
+  modal.classList.add('open');
+  let card=null;
+  if(kanbanData&&kanbanData.columns){
+    for(const col of Object.values(kanbanData.columns)){
+      const found=col.find(c=>c.id===taskId);
+      if(found){card=found;break}
+    }
+  }
+  if(!card){
+    content.innerHTML='<div class="empty">Loading...</div>';
+    try{const r=await fetch(`/api/kanban/task/${taskId}`);card=await r.json()}
+    catch(e){content.innerHTML='<div class="empty">Failed to load task</div>';return}
+  }
+  const fields=[
+    ['Title',card.title],['Status',card.status],['Type',card.type],
+    ['Priority',card.priority],['Agent',card.agent],['Source',card.source],
+    ['Skill',card.skill],['Tools',card.tools],
+    ['Acceptance Criteria',card.acceptance_criteria],['Result',card.result],
+    ['Attempts',card.attempts?`${card.attempts}/${card.max_attempts||3}`:'0'],
+    ['Created',card.created_at],['Started',card.started_at],['Completed',card.completed_at],
+    ['Time',card.actual_minutes!=null?`${card.actual_minutes}min (est. ${card.estimated_minutes||'?'}min)`:(card.estimated_minutes?`est. ${card.estimated_minutes}min`:'')],
+    ['Channel',card.channel],['Session Key',card.session_key],['Notes',card.notes],
+  ].filter(([,v])=>v);
+  content.innerHTML=`<div class="kanban-modal-title">${card.title||'Task'}</div>`+
+    fields.map(([label,value])=>
+      `<div class="kanban-modal-field"><div class="kanban-modal-label">${label}</div><div class="kanban-modal-value">${String(value).replace(/</g,'&lt;')}</div></div>`
+    ).join('');
+}
+
+function closeKanbanModal(){document.getElementById('kanbanModal').classList.remove('open')}
 
 setInterval(()=>{timer--;if(timer<=0){loadData();timer=60}$('countdown').textContent=timer+'s'},1000);
 loadData();

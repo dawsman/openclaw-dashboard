@@ -6,6 +6,7 @@ import functools
 import http.server
 import json
 import os
+import re
 import socket
 import subprocess
 import threading
@@ -13,6 +14,7 @@ import time
 import sys
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 
 VERSION = "2.4.0"
 PORT = 8080
@@ -22,6 +24,117 @@ CONFIG_FILE = os.path.join(DIR, "config.json")
 REFRESH_SCRIPT = os.path.join(DIR, "refresh.sh")
 DATA_FILE = os.path.join(DIR, "data.json")
 REFRESH_TIMEOUT = 15
+
+# NocoDB config for kanban panel
+NOCODB_URL = "http://127.0.0.1:8080"
+NOCODB_TABLE_ID = "mjdq7yahdxeeqnd"
+NOCODB_TOKEN_FILE = os.path.expanduser("~/containers/nocodb/nocodb-mcp.env")
+
+
+def get_nocodb_token():
+    """Read NocoDB API token from env file."""
+    try:
+        with open(NOCODB_TOKEN_FILE, "r") as f:
+            for line in f:
+                if line.startswith("NOCODB_API_TOKEN="):
+                    return line.strip().split("=", 1)[1]
+    except FileNotFoundError:
+        pass
+    return None
+
+
+def fetch_kanban_data():
+    """Fetch tasks from NocoDB and group by status."""
+    token = get_nocodb_token()
+    if not token:
+        return {"error": "NocoDB token not found"}
+
+    url = f"{NOCODB_URL}/api/v2/tables/{NOCODB_TABLE_ID}/records?limit=200&sort=-Created At"
+    req = urllib.request.Request(url)
+    req.add_header("xc-token", token)
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, TimeoutError) as e:
+        return {"error": f"NocoDB request failed: {e}"}
+
+    records = data.get("list", [])
+    columns = {
+        "backlog": [], "queued": [], "in_progress": [],
+        "review": [], "done": [], "failed": [], "escalated": []
+    }
+
+    completed_today = 0
+    total_minutes = 0
+    completed_count = 0
+    agent_counts = {}
+
+    for rec in records:
+        status = (rec.get("Status") or "backlog").lower().replace(" ", "_")
+        if status not in columns:
+            status = "backlog"
+
+        card = {
+            "id": rec.get("Id"),
+            "title": rec.get("Title", ""),
+            "status": status,
+            "type": rec.get("Type", ""),
+            "priority": rec.get("Priority", "normal"),
+            "agent": rec.get("Agent", ""),
+            "skill": rec.get("Skill", ""),
+            "tools": rec.get("Tools", ""),
+            "source": rec.get("Source", ""),
+            "acceptance_criteria": rec.get("Acceptance Criteria", ""),
+            "result": rec.get("Result", ""),
+            "attempts": rec.get("Attempts", 0),
+            "max_attempts": rec.get("Max Attempts", 3),
+            "created_at": rec.get("Created At", ""),
+            "started_at": rec.get("Started At", ""),
+            "completed_at": rec.get("Completed At", ""),
+            "estimated_minutes": rec.get("Estimated Minutes"),
+            "actual_minutes": rec.get("Actual Minutes"),
+            "channel": rec.get("Channel", ""),
+            "session_key": rec.get("Session Key", ""),
+            "notes": rec.get("Notes", ""),
+        }
+
+        if status == "done":
+            completed_at = rec.get("Completed At", "")
+            if completed_at:
+                try:
+                    dt = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
+                    age_hours = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
+                    if age_hours > 24:
+                        continue
+                    completed_today += 1
+                except (ValueError, TypeError):
+                    pass
+            actual = rec.get("Actual Minutes")
+            if actual:
+                total_minutes += actual
+                completed_count += 1
+
+        if status in ("queued", "in_progress", "review"):
+            agent = rec.get("Agent", "unknown")
+            agent_counts[agent] = agent_counts.get(agent, 0) + 1
+
+        columns[status].append(card)
+
+    active = len(columns["queued"]) + len(columns["in_progress"]) + len(columns["review"])
+    avg_minutes = round(total_minutes / completed_count) if completed_count else 0
+
+    return {
+        "columns": columns,
+        "stats": {
+            "active": active,
+            "completed_today": completed_today,
+            "avg_completion_minutes": avg_minutes,
+            "agent_counts": agent_counts,
+        }
+    }
+
 
 _last_refresh = 0
 _refresh_lock = threading.Lock()
@@ -281,6 +394,12 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/refresh" or self.path.startswith("/api/refresh?"):
             self.handle_refresh()
+        elif self.path == "/api/kanban" or self.path.startswith("/api/kanban?"):
+            self.handle_kanban()
+        elif self.path.startswith("/api/kanban/stats"):
+            self.handle_kanban_stats()
+        elif self.path.startswith("/api/kanban/task/"):
+            self.handle_kanban_task()
         else:
             super().do_GET()
 
@@ -365,14 +484,62 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Cache-Control", "no-cache")
         origin = self.headers.get("Origin", "")
-        if origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
+        if origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:") or origin.startswith("http://100.87.79.17:"):
             self.send_header("Access-Control-Allow-Origin", origin)
         else:
-            self.send_header("Access-Control-Allow-Origin", "http://localhost:8080")
+            self.send_header("Access-Control-Allow-Origin", "http://localhost:8088")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
+    def handle_kanban(self):
+        try:
+            data = fetch_kanban_data()
+            if "error" in data:
+                self._send_json(503, data)
+            else:
+                self._send_json(200, data)
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
+    def handle_kanban_stats(self):
+        try:
+            data = fetch_kanban_data()
+            if "error" in data:
+                self._send_json(503, data)
+            else:
+                self._send_json(200, data.get("stats", {}))
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
+    def handle_kanban_task(self):
+        try:
+            task_id = self.path.split("/api/kanban/task/")[1].split("?")[0]
+        except (IndexError, ValueError):
+            self._send_json(400, {"error": "Invalid task ID"})
+            return
+
+        if not re.match(r'^[a-zA-Z0-9_-]+$', task_id):
+            self._send_json(400, {"error": "Invalid task ID"})
+            return
+
+        token = get_nocodb_token()
+        if not token:
+            self._send_json(503, {"error": "NocoDB token not found"})
+            return
+
+        url = f"{NOCODB_URL}/api/v2/tables/{NOCODB_TABLE_ID}/records/{task_id}"
+        req = urllib.request.Request(url)
+        req.add_header("xc-token", token)
+
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                record = json.loads(resp.read().decode())
+            self._send_json(200, record)
+        except urllib.error.HTTPError as e:
+            self._send_json(e.code, {"error": f"NocoDB: {e.code}"})
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
     def log_message(self, format, *args):
         # Quiet logging — only log errors and refreshes
         msg = format % args
