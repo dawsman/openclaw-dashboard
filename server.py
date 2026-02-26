@@ -49,7 +49,7 @@ def fetch_kanban_data():
     if not token:
         return {"error": "NocoDB token not found"}
 
-    url = f"{NOCODB_URL}/api/v2/tables/{NOCODB_TABLE_ID}/records?limit=200&sort=-Created At"
+    url = f"{NOCODB_URL}/api/v2/tables/{NOCODB_TABLE_ID}/records?limit=200&sort=-Created%20At"
     req = urllib.request.Request(url)
     req.add_header("xc-token", token)
     req.add_header("Content-Type", "application/json")
