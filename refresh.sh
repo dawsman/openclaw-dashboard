@@ -455,6 +455,74 @@ try:
 except Exception as _e:
     import sys; print(f"[dashboard warn] loadavg: {_e}", file=sys.stderr)
 
+# ── Activity feed ──
+activity_feed = []
+
+# Cron job completions/failures (from cron jobs state)
+if os.path.exists(cron_path):
+    try:
+        with open(cron_path) as _f:
+            _cron_jobs = json.load(_f).get('jobs', [])
+        for job in _cron_jobs:
+            state = job.get('state', {})
+            last_run_ms = state.get('lastRunAtMs', 0)
+            if last_run_ms > 0:
+                try:
+                    run_dt = datetime.fromtimestamp(last_run_ms/1000, tz=local_tz)
+                    age_h = (now - run_dt).total_seconds() / 3600
+                    if age_h <= 12:
+                        status = state.get('lastStatus', 'unknown')
+                        icon = '✅' if status == 'ok' else '❌' if status == 'error' else '⏰'
+                        dur = state.get('lastDurationMs', 0)
+                        dur_str = f" ({dur/1000:.0f}s)" if dur else ''
+                        activity_feed.append({
+                            'time': run_dt.strftime('%H:%M'),
+                            'timestamp': last_run_ms,
+                            'icon': icon,
+                            'message': f'Cron: {job.get("name", "?")} {status}{dur_str}',
+                            'type': 'cron',
+                        })
+                except Exception:
+                    pass
+    except Exception as _e:
+        import sys; print(f"[dashboard warn] activity feed cron: {_e}", file=sys.stderr)
+
+# Watchdog events (from log file, last 12h)
+watchdog_log = os.path.expanduser('~/logs/agent-session-watcher.log')
+if os.path.exists(watchdog_log):
+    try:
+        with open(watchdog_log) as _f:
+            lines = _f.readlines()
+        for line in lines[-200:]:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(' | ', 1)
+            if len(parts) < 2:
+                continue
+            try:
+                ts_str = parts[0].strip()
+                ts_dt = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=local_tz)
+                age_h = (now - ts_dt).total_seconds() / 3600
+                if age_h <= 12:
+                    msg = parts[1].strip()
+                    icon = msg[0] if msg and ord(msg[0]) > 127 else '📋'
+                    activity_feed.append({
+                        'time': ts_dt.strftime('%H:%M'),
+                        'timestamp': int(ts_dt.timestamp() * 1000),
+                        'icon': icon,
+                        'message': msg[2:].strip() if msg and ord(msg[0]) > 127 else msg,
+                        'type': 'watchdog',
+                    })
+            except (ValueError, IndexError):
+                continue
+    except Exception as _e:
+        import sys; print(f"[dashboard warn] activity feed watchdog: {_e}", file=sys.stderr)
+
+# Sort by timestamp descending, limit to 20
+activity_feed.sort(key=lambda x: -x.get('timestamp', 0))
+activity_feed = activity_feed[:20]
+
 # ── Sessions ──
 known_sids = {}
 sessions_list = []
@@ -953,6 +1021,9 @@ output = {
 
     # System vitals
     'systemVitals': system_vitals,
+
+    # Activity feed
+    'activityFeed': activity_feed,
 
     # Costs
     'totalCostToday': round(total_cost_today, 2),
