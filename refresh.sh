@@ -88,6 +88,78 @@ try:
 except Exception as _e:
     import sys; print(f"[dashboard warn] {_e}", file=sys.stderr)
 
+# ── Provider status (from auth-profiles.json across all agents) ──
+provider_agg = {}  # provider_id -> {errorCount, rate_limit, lastFailureAt, cooldownUntil, lastUsed}
+for ap_file in glob.glob(os.path.join(base, '*/agent/auth-profiles.json')):
+    try:
+        with open(ap_file) as _f:
+            ap = json.load(_f)
+        for profile_key, stats in ap.get('usageStats', {}).items():
+            provider_id = profile_key.split(':')[0]
+            if provider_id not in provider_agg:
+                provider_agg[provider_id] = {
+                    'errorCount': 0, 'rate_limit': 0,
+                    'lastFailureAt': 0, 'cooldownUntil': 0, 'lastUsed': 0,
+                }
+            agg = provider_agg[provider_id]
+            agg['errorCount'] += stats.get('errorCount', 0)
+            agg['rate_limit'] += stats.get('failureCounts', {}).get('rate_limit', 0)
+            agg['lastFailureAt'] = max(agg['lastFailureAt'], stats.get('lastFailureAt', 0))
+            agg['cooldownUntil'] = max(agg['cooldownUntil'], stats.get('cooldownUntil', 0))
+            agg['lastUsed'] = max(agg['lastUsed'], stats.get('lastUsed', 0))
+    except Exception as _e:
+        import sys; print(f"[dashboard warn] auth-profiles: {_e}", file=sys.stderr)
+
+# GitHub Copilot token expiry
+copilot_token_info = {}
+copilot_token_path = os.path.join(openclaw_path, 'credentials', 'github-copilot.token.json')
+if os.path.exists(copilot_token_path):
+    try:
+        with open(copilot_token_path) as _f:
+            ct = json.load(_f)
+        copilot_token_info = {
+            'expiresAt': ct.get('expiresAt', 0),
+            'updatedAt': ct.get('updatedAt', 0),
+        }
+    except Exception as _e:
+        import sys; print(f"[dashboard warn] copilot token: {_e}", file=sys.stderr)
+
+# Determine provider status
+now_ms = int(now.timestamp() * 1000)
+twenty_four_hours_ms = 24 * 60 * 60 * 1000
+provider_status = {}
+for pid, agg in provider_agg.items():
+    recent_failure = (now_ms - agg['lastFailureAt']) < twenty_four_hours_ms if agg['lastFailureAt'] else False
+    if agg['cooldownUntil'] > now_ms:
+        status = 'cooldown'
+    elif agg['errorCount'] >= 5 and recent_failure:
+        status = 'down'
+    elif agg['errorCount'] >= 1 and recent_failure:
+        status = 'degraded'
+    else:
+        status = 'ok'
+    provider_status[pid] = {
+        'status': status,
+        'errorCount': agg['errorCount'],
+        'rateLimitCount': agg['rate_limit'],
+        'lastFailureAt': agg['lastFailureAt'],
+        'cooldownUntil': agg['cooldownUntil'],
+        'lastUsed': agg['lastUsed'],
+    }
+
+# Add github-copilot entry from token file
+if copilot_token_info:
+    expired = copilot_token_info['expiresAt'] < now_ms if copilot_token_info.get('expiresAt') else False
+    provider_status['github-copilot'] = {
+        'status': 'down' if expired else 'ok',
+        'errorCount': 0,
+        'rateLimitCount': 0,
+        'lastFailureAt': 0,
+        'cooldownUntil': 0,
+        'lastUsed': copilot_token_info.get('updatedAt', 0),
+        'tokenExpiresAt': copilot_token_info.get('expiresAt', 0),
+    }
+
 # ── OpenClaw config ──
 skills = []
 available_models = []
@@ -549,6 +621,11 @@ subagent_today = defaultdict(new_bucket)
 subagent_7d = defaultdict(new_bucket)
 subagent_30d = defaultdict(new_bucket)
 
+# Per-provider API call counts
+provider_calls_today = defaultdict(int)
+provider_calls_7d = defaultdict(int)
+provider_calls_all = defaultdict(int)
+
 # Daily cost/token tracking for charts
 daily_costs = defaultdict(lambda: defaultdict(float))  # date -> model -> cost
 daily_tokens = defaultdict(lambda: defaultdict(int))    # date -> model -> tokens
@@ -599,6 +676,7 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                     if 'delivery-mirror' in model: continue
 
                     name = model_name(model)
+                    provider_id = model.split('/')[0] if '/' in model else 'unknown'
                     cost_total = usage.get('cost',{}).get('total',0) if isinstance(usage.get('cost'),dict) else 0
                     if cost_total < 0: cost_total = 0  # Skip corrupted negative costs
                     inp = usage.get('input',0)
@@ -606,6 +684,7 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                     cr = usage.get('cacheRead',0)
                     tt = usage.get('totalTokens',0)
 
+                    provider_calls_all[provider_id] += 1
                     models_all[name]['calls'] += 1
                     models_all[name]['input'] += inp
                     models_all[name]['output'] += out
@@ -651,11 +730,13 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
 
                     if msg_date == today_str:
                         add_bucket(models_today, name, inp, out, cr, tt, cost_total)
+                        provider_calls_today[provider_id] += 1
                         if is_subagent:
                             add_bucket(subagent_today, name, inp, out, cr, tt, cost_total)
 
                     if msg_date >= date_7d:
                         add_bucket(models_7d, name, inp, out, cr, tt, cost_total)
+                        provider_calls_7d[provider_id] += 1
                         if is_subagent:
                             add_bucket(subagent_7d, name, inp, out, cr, tt, cost_total)
 
@@ -819,6 +900,14 @@ output = {
     # Gateway health
     'gateway': gateway,
     'compactionMode': compaction_mode,
+
+    # Provider status & call counts
+    'providerStatus': {k: v for k, v in provider_status.items()},
+    'providerCalls': {
+        'today': dict(provider_calls_today),
+        '7d': dict(provider_calls_7d),
+        'all': dict(provider_calls_all),
+    },
 
     # Costs
     'totalCostToday': round(total_cost_today, 2),
