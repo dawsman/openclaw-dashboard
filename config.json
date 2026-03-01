@@ -7,13 +7,16 @@
     "preset": "midnight"
   },
   "panels": {
+    "providers": true,
+    "agents": true,
+    "vitals": true,
+    "activityFeed": true,
+    "errorLog": true,
     "kanban": true,
-    "sessions": true,
     "crons": true,
+    "subagentRuns": true,
     "skills": true,
-    "tokenUsage": true,
-    "subagentUsage": true,
-    "models": true
+    "actions": true
   },
   "refresh": {
     "intervalSeconds": 30,
