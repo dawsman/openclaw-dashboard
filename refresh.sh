@@ -413,6 +413,48 @@ except Exception as _e:
     import sys; print(f"[dashboard info] Gateway session query unavailable: {_e}", file=sys.stderr)
     gateway_model_map = {}
 
+# ── System vitals ──
+system_vitals = {'cpuTemp': None, 'diskUsedPct': None, 'diskFreeGb': None, 'loadAvg': None}
+
+# CPU temp
+try:
+    result = subprocess.run(['sensors', '-j'], capture_output=True, text=True, timeout=5)
+    if result.returncode == 0:
+        sensors = json.loads(result.stdout)
+        for chip, data in sensors.items():
+            if 'coretemp' in chip.lower() or 'k10temp' in chip.lower():
+                for key, val in data.items():
+                    if isinstance(val, dict) and ('Package' in key or 'Tctl' in key or 'Tdie' in key):
+                        for subkey, subval in val.items():
+                            if subkey.endswith('_input'):
+                                system_vitals['cpuTemp'] = round(subval, 1)
+                                break
+                        if system_vitals['cpuTemp'] is not None:
+                            break
+                if system_vitals['cpuTemp'] is not None:
+                    break
+except Exception as _e:
+    import sys; print(f"[dashboard warn] sensors: {_e}", file=sys.stderr)
+
+# Disk usage
+try:
+    result = subprocess.run(['df', '--output=pcent,avail', '/'], capture_output=True, text=True, timeout=5)
+    lines = result.stdout.strip().split('\n')
+    if len(lines) >= 2:
+        parts = lines[1].split()
+        system_vitals['diskUsedPct'] = int(parts[0].replace('%', ''))
+        avail_kb = int(parts[1])
+        system_vitals['diskFreeGb'] = round(avail_kb / 1048576, 1)
+except Exception as _e:
+    import sys; print(f"[dashboard warn] df: {_e}", file=sys.stderr)
+
+# Load average
+try:
+    with open('/proc/loadavg') as _f:
+        system_vitals['loadAvg'] = float(_f.read().split()[0])
+except Exception as _e:
+    import sys; print(f"[dashboard warn] loadavg: {_e}", file=sys.stderr)
+
 # ── Sessions ──
 known_sids = {}
 sessions_list = []
@@ -908,6 +950,9 @@ output = {
         '7d': dict(provider_calls_7d),
         'all': dict(provider_calls_all),
     },
+
+    # System vitals
+    'systemVitals': system_vitals,
 
     # Costs
     'totalCostToday': round(total_cost_today, 2),
