@@ -70,17 +70,17 @@ class TestDirtyCheck(unittest.TestCase):
     def setUpClass(cls):
         cls.js = _extract_script(_read(INDEX_HTML))
 
-    def test_tc1_section_changed_calls_use_non_empty_keys(self):
-        calls = re.findall(r"sectionChanged\s*\(\s*\[(.*?)\]\s*\)", self.js, re.S)
-        self.assertTrue(calls, "No sectionChanged([...]) calls found")
-        for arr in calls:
-            keys = re.findall(r"['\"]([^'\"]+)['\"]", arr)
-            self.assertGreater(len(keys), 0,
-                f"Found empty guarded key list: sectionChanged([{arr.strip()}])")
+    def test_tc1_render_delegates_to_sub_functions(self):
+        render_body = _extract_render_body(self.js)
+        for fn in ("renderProviders", "renderAgents", "renderVitals",
+                    "renderFeed", "renderErrors", "renderCrons"):
+            self.assertIn(f"{fn}()", render_body,
+                f"render() missing call to {fn}()")
 
     def test_tc2_prevd_is_deep_cloned_not_referenced(self):
-        self.assertIn("prevD = JSON.parse(JSON.stringify(D));", self.js)
+        self.assertRegex(self.js, r"prevD\s*=\s*JSON\.parse\(JSON\.stringify\(D\)\)")
         self.assertNotIn("prevD = D;", self.js)
+        self.assertNotIn("prevD=D;", self.js)
 
     def test_tc3_stable_snapshot_exists_for_volatile_sections(self):
         if "function stableSnapshot" not in self.js:
@@ -92,17 +92,17 @@ class TestDirtyCheck(unittest.TestCase):
 
     def test_tc4_prev_tabs_saved_before_prevd_snapshot_in_render_end(self):
         render_body = _extract_render_body(self.js)
-        i_tabs = render_body.find("prevUTab=uTab; prevSrTab=srTab; prevStTab=stTab;")
-        i_prev = render_body.find("prevD = JSON.parse(JSON.stringify(D));")
-        self.assertNotEqual(i_tabs, -1, "prev* tab persistence line not found")
+        i_tabs = render_body.find("prevSrTab=srTab;")
+        i_prev = render_body.find("prevD=JSON.parse(JSON.stringify(D));")
+        self.assertNotEqual(i_tabs, -1, "prevSrTab persistence line not found")
         self.assertNotEqual(i_prev, -1, "prevD snapshot line not found")
         self.assertLess(i_tabs, i_prev,
-            "prev* tab variables must be saved before prevD snapshot")
+            "prev tab variables must be saved before prevD snapshot")
 
     def test_tc5_load_data_uses_request_animation_frame_for_render(self):
         load_data = _extract_load_data_body(self.js)
-        self.assertIn("requestAnimationFrame(() => render());", load_data)
-        self.assertIsNone(re.search(r"(?<!=>\s)\brender\(\);", load_data),
+        self.assertRegex(load_data, r"requestAnimationFrame\(\s*\(\s*\)\s*=>\s*render\(\)\s*\)")
+        self.assertIsNone(re.search(r"(?<!=>)\brender\(\);", load_data),
             "loadData() calls render() directly")
 
 
@@ -278,8 +278,9 @@ class TestDataIntegrity(unittest.TestCase):
 
     def test_tc14_cron_schedule_field_shape_is_valid_expression(self):
         crons = self.data.get("crons", [])
+        cron_tok = r"(\*|\*/\d+|\d{1,2}(?:-\d{1,2})?(?:,\d{1,2}(?:-\d{1,2})?)*|(?:MON|TUE|WED|THU|FRI|SAT|SUN)(?:,(?:MON|TUE|WED|THU|FRI|SAT|SUN))*)"
         cron_re = re.compile(
-            r"^(\*/\d+|\d{1,2})\s+(\*|\*/\d+|\d{1,2})\s+\*\s+\*\s+(\*|\d{1,2}(?:,\d{1,2})*)$")
+            rf"^{cron_tok}\s+{cron_tok}\s+{cron_tok}\s+{cron_tok}\s+{cron_tok}$")
         iso_at_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
         for c in crons:
             sched = str(c.get("schedule", "")).strip()

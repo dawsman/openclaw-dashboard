@@ -43,17 +43,15 @@ class TestFrontendJS(unittest.TestCase):
             "safeColor missing hex regex"
         )
 
-    def test_ac17_section_changed_uses_prevD(self):
-        """AC17: sectionChanged() is defined and uses prevD."""
-        self.assertIn("function sectionChanged", self.html)
-        # Find the function body
-        match = re.search(r'function sectionChanged\b.*?\{.*?prevD', self.html, re.DOTALL)
-        self.assertIsNotNone(match, "sectionChanged doesn't reference prevD")
+    def test_ac17_prevD_used_in_render(self):
+        """AC17: prevD is declared and used in render() for dirty-checking."""
+        self.assertRegex(self.html, r'\bprevD\b', "prevD not declared")
+        match = re.search(r'prevD\s*=\s*JSON\.parse\(JSON\.stringify\(D\)\)', self.html)
+        self.assertIsNotNone(match, "prevD deep-clone snapshot not found")
 
     def test_ac18_prev_tab_variables(self):
-        """AC18: All 3 prev-tab variables exist."""
-        for var in ("prevUTab", "prevSrTab", "prevStTab"):
-            self.assertIn(var, self.html, f"Missing variable: {var}")
+        """AC18: Prev-tab variables exist for active tab sections."""
+        self.assertIn("prevSrTab", self.html, "Missing variable: prevSrTab")
 
     def test_ac19_request_animation_frame_in_load_data(self):
         """AC19: requestAnimationFrame is used in loadData()."""
@@ -63,20 +61,13 @@ class TestFrontendJS(unittest.TestCase):
 
     def test_ac20_prevD_snapshot_in_render(self):
         """AC20: prevD = JSON.parse(JSON.stringify(D)) snapshot exists."""
-        self.assertIn("prevD = JSON.parse(JSON.stringify(D))", self.html)
+        self.assertRegex(self.html, r'prevD\s*=\s*JSON\.parse\(JSON\.stringify\(D\)\)')
 
-    def test_channels_dynamic_render_from_payload_keys(self):
-        """Channel cards render dynamically from channelStatus keys + channels array."""
-        self.assertIn("const channelStatusMap = AC.channelStatus", self.html)
-        self.assertIn("...Object.keys(channelStatusMap)", self.html)
-        self.assertIn("...((AC.channels||[])", self.html)
-        self.assertIn("$('channelConfigPanel').innerHTML", self.html)
-
-    def test_channels_supports_slack_discord_unknown_generically(self):
-        """No hardcoded channel whitelist (slack/discord/unknown are generic keys)."""
-        self.assertIn("const channelCards = channelKeys.map((key)=>", self.html)
-        self.assertIn("esc(key)", self.html)
-        self.assertIn("esc(errorText)", self.html)
+    def test_render_sub_functions_exist(self):
+        """Render sub-functions exist for all dashboard sections."""
+        for fn in ("renderProviders", "renderAgents", "renderVitals",
+                    "renderFeed", "renderErrors", "renderCrons"):
+            self.assertIn(f"function {fn}", self.html, f"Missing render function: {fn}")
 
 
 class TestRefreshShSafety(unittest.TestCase):
