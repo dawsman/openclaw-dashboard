@@ -29,6 +29,7 @@ class TestDataSchema(unittest.TestCase):
             "gateway", "totalCostToday", "totalCostAllTime", "projectedMonthly",
             "crons", "sessions", "tokenUsage", "subagentRuns", "dailyChart",
             "skills", "gitLog", "agentConfig",
+            "providerStatus", "providerCalls", "systemVitals", "activityFeed",
         ]
         for key in required:
             self.assertIn(key, self.data, f"Missing top-level key: {key}")
@@ -83,6 +84,39 @@ class TestDataSchema(unittest.TestCase):
         else:
             status = gw
         self.assertIn(status, ("online", "offline", "unknown"))
+
+    def test_provider_status_schema(self):
+        """Provider status has expected structure."""
+        ps = self.data.get("providerStatus", {})
+        self.assertIsInstance(ps, dict)
+        for provider, info in ps.items():
+            self.assertIn("status", info)
+            self.assertIn(info["status"], ["ok", "degraded", "down", "cooldown"])
+            self.assertIn("errorCount", info)
+
+    def test_system_vitals_schema(self):
+        """System vitals has expected keys."""
+        sv = self.data.get("systemVitals", {})
+        self.assertIsInstance(sv, dict)
+        for key in ("cpuTemp", "diskUsedPct", "diskFreeGb", "loadAvg"):
+            self.assertIn(key, sv)
+
+    def test_activity_feed_schema(self):
+        """Activity feed is a list of events."""
+        af = self.data.get("activityFeed", [])
+        self.assertIsInstance(af, list)
+        for event in af:
+            self.assertIn("time", event)
+            self.assertIn("message", event)
+            self.assertIn("type", event)
+
+    def test_provider_calls_schema(self):
+        """Provider calls has today/7d/all buckets."""
+        pc = self.data.get("providerCalls", {})
+        self.assertIsInstance(pc, dict)
+        for period in ("today", "7d", "all"):
+            self.assertIn(period, pc)
+            self.assertIsInstance(pc[period], dict)
 
 
 if __name__ == "__main__":
