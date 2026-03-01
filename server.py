@@ -408,6 +408,11 @@ def call_gateway(system, history, question, port, token, model):
 
 
 class DashboardHandler(http.server.SimpleHTTPRequestHandler):
+    ALLOWED_CONTAINERS = [
+        "rocketchat-app", "rocketchat-mongo", "nocodb-app", "nocodb-pg",
+        "adguard-home", "fantasy-pl-mcp", "google-analytics-mcp",
+    ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIR, **kwargs)
 
@@ -428,12 +433,22 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_kanban_stats()
         elif self.path.startswith("/api/kanban/task/"):
             self.handle_kanban_task()
+        elif self.path == "/api/containers":
+            self._send_json(200, {"containers": DashboardHandler.ALLOWED_CONTAINERS})
+        elif self.path == "/api/cron-jobs":
+            self.handle_cron_list()
         else:
             super().do_GET()
 
     def do_POST(self):
         if self.path == "/api/chat":
             self.handle_chat()
+        elif self.path == "/api/action/restart-gateway":
+            self.handle_action_restart_gateway()
+        elif self.path == "/api/action/restart-container":
+            self.handle_action_restart_container()
+        elif self.path == "/api/action/run-cron":
+            self.handle_action_run_cron()
         else:
             self.send_response(404)
             self.end_headers()
@@ -568,6 +583,85 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(e.code, {"error": f"NocoDB: {e.code}"})
         except Exception as e:
             self._send_json(500, {"error": str(e)})
+
+    def handle_action_restart_gateway(self):
+        try:
+            result = subprocess.run(
+                ["systemctl", "--user", "restart", "openclaw-gateway"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                self._send_json(200, {"ok": True, "message": "Gateway restarted"})
+            else:
+                self._send_json(500, {"ok": False, "error": result.stderr.strip()})
+        except subprocess.TimeoutExpired:
+            self._send_json(504, {"ok": False, "error": "Restart timed out"})
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+
+    def handle_action_restart_container(self):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(length))
+        except (json.JSONDecodeError, ValueError):
+            self._send_json(400, {"error": "Invalid JSON"})
+            return
+        container = body.get("container", "")
+        if container not in self.ALLOWED_CONTAINERS:
+            self._send_json(400, {"error": f"Container '{container}' not in allowlist"})
+            return
+        try:
+            result = subprocess.run(
+                ["podman", "restart", container],
+                capture_output=True, text=True, timeout=60,
+            )
+            if result.returncode == 0:
+                self._send_json(200, {"ok": True, "message": f"Restarted {container}"})
+            else:
+                self._send_json(500, {"ok": False, "error": result.stderr.strip()})
+        except subprocess.TimeoutExpired:
+            self._send_json(504, {"ok": False, "error": "Restart timed out"})
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+
+    def handle_action_run_cron(self):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(length))
+        except (json.JSONDecodeError, ValueError):
+            self._send_json(400, {"error": "Invalid JSON"})
+            return
+        job_id = body.get("jobId", "")
+        if not re.match(r'^[a-f0-9]{8}$', job_id):
+            self._send_json(400, {"error": "Invalid job ID format"})
+            return
+        try:
+            result = subprocess.run(
+                ["openclaw", "cron", "run", "--timeout", "120000", job_id],
+                capture_output=True, text=True, timeout=130,
+            )
+            if result.returncode == 0:
+                self._send_json(200, {"ok": True, "message": f"Triggered cron {job_id}"})
+            else:
+                self._send_json(500, {"ok": False, "error": result.stderr.strip()[:200]})
+        except subprocess.TimeoutExpired:
+            self._send_json(504, {"ok": False, "error": "Cron execution timed out"})
+        except Exception as e:
+            self._send_json(500, {"ok": False, "error": str(e)})
+
+    def handle_cron_list(self):
+        cron_path = os.path.join(OPENCLAW_PATH, "cron", "jobs.json")
+        try:
+            with open(cron_path) as f:
+                jobs = json.load(f).get("jobs", [])
+            result = [
+                {"id": j.get("id", "")[:8], "name": j.get("name", ""), "enabled": j.get("enabled", True)}
+                for j in jobs if j.get("enabled", True)
+            ]
+            self._send_json(200, {"jobs": result})
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
+
     def log_message(self, format, *args):
         # Quiet logging — only log errors and refreshes
         msg = format % args
