@@ -278,20 +278,36 @@ def build_dashboard_prompt(data):
         "=== GATEWAY ===",
         f"Status: {gw.get('status', '?')} | PID: {gw.get('pid', '?')} | "
         f"Uptime: {gw.get('uptime', '?')} | Memory: {gw.get('memory', '?')}",
-        "",
-        "=== COSTS ===",
-        f"Today: ${data.get('totalCostToday', 0):.4f} "
-        f"(sub-agents: ${data.get('subagentCostToday', 0):.4f})",
-        f"All-time: ${data.get('totalCostAllTime', 0):.2f} | "
-        f"Projected monthly: ${data.get('projectedMonthly', 0):.0f}",
     ]
 
-    breakdown = data.get("costBreakdown") or []
-    if breakdown:
-        lines.append("By model (all-time): " + ", ".join(
-            f"{d.get('model', '?')} ${d.get('cost', 0):.2f}"
-            for d in breakdown[:5]
-        ))
+    # Provider status
+    lines += ["", "=== PROVIDERS ==="]
+    ps = data.get("providerStatus") or {}
+    pc = data.get("providerCalls") or {}
+    for pid, info in ps.items():
+        calls_today = pc.get("today", {}).get(pid, 0)
+        calls_7d = pc.get("7d", {}).get(pid, 0)
+        status = info.get("status", "?")
+        extra = ""
+        if info.get("cooldownRemainingMs"):
+            mins = info["cooldownRemainingMs"] // 60000
+            extra = f" (cooldown {mins}m)"
+        elif info.get("tokenRemainingDays") is not None:
+            extra = f" (token {info['tokenRemainingDays']}d left)"
+        lines.append(
+            f"  {pid}: {status}{extra} | "
+            f"{calls_today} calls today, {calls_7d} 7d | "
+            f"{info.get('errorCount', 0)} errors, {info.get('rateLimitCount', 0)} rate limits"
+        )
+
+    # System vitals
+    sv = data.get("systemVitals") or {}
+    lines += [
+        "", "=== SYSTEM ===",
+        f"CPU: {sv.get('cpuTemp', '?')}°C | "
+        f"Disk: {sv.get('diskUsedPct', '?')}% ({sv.get('diskFreeGb', '?')}GB free) | "
+        f"Load: {sv.get('loadAvg', '?')}"
+    ]
 
     sess = data.get("sessions") or []
     lines += [
