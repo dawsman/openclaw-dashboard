@@ -714,6 +714,7 @@ function renderProviders(){
   const ps=D.providerStatus||{};
   const pc=D.providerCalls||{};
   const sp=D.providerSpend||{};
+  const pt=D.providerTokens||{};
   const ids=Object.keys(ps);
   if(!ids.length){$('providerGrid').innerHTML='<div class="empty">No provider data</div>';return}
   $('providerGrid').innerHTML=ids.map(id=>{
@@ -725,11 +726,11 @@ function renderProviders(){
     const weekCalls=(pc['7d']&&pc['7d'][id])||0;
     const todaySpend=(sp.today&&sp.today[id])||0;
     const weekSpend=(sp['7d']&&sp['7d'][id])||0;
+    const moSpend=(sp['30d']&&sp['30d'][id])||0;
     const role=p.role||'';
     const plan=p.plan||'';
-    const roleBadge=role==='primary'?'\uD83D\uDFE2':role==='fallback'?'\uD83D\uDD36':'';
     let quotaHtml='';
-    // GitHub Copilot: show premium requests used / limit with progress bar
+    // GitHub Copilot: premium requests progress bar
     if(id==='github-copilot'&&p.premiumLimit){
       const used=p.premiumUsed||0;
       const limit=p.premiumLimit;
@@ -746,17 +747,42 @@ function renderProviders(){
         <div style="font-size:10px;color:var(--muted);margin-top:2px">${rem} remaining this month</div>
       </div>`;
     }
-    // Pay-per-use providers (OpenRouter etc): show spend
-    if(p.providerType==='credits'||(todaySpend>0||weekSpend>0)){
-      const hasSpend=todaySpend>0||weekSpend>0;
-      if(hasSpend&&!quotaHtml){
-        quotaHtml=`<div class="provider-quota">
-          <div style="font-size:11px;display:flex;gap:12px">
-            <span>\uD83D\uDCB8 Today: <strong style="color:var(--textStrong)">$${todaySpend.toFixed(2)}</strong></span>
-            <span>7d: <strong style="color:var(--textStrong)">$${weekSpend.toFixed(2)}</strong></span>
-          </div>
-        </div>`;
-      }
+    // OpenAI OWALF: daily token usage estimation gauge
+    if(id==='openai-codex'&&!quotaHtml){
+      const tokToday=(pt.today&&pt.today[id])||0;
+      const peak=(pt.dailyPeak&&pt.dailyPeak[id])||0;
+      const ref=peak>0?peak:23000000; // 23M observed peak with no errors
+      const pct=Math.min(100,Math.round(tokToday/ref*100));
+      const barCol=pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)';
+      const fmtTok=t=>t>=1e6?(t/1e6).toFixed(1)+'M':t>=1e3?Math.round(t/1e3)+'K':t;
+      quotaHtml=`<div class="provider-quota">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+          <span>Daily tokens (est.)</span><span style="color:var(--textStrong)">${fmtTok(tokToday)} / ~${fmtTok(ref)}</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px;transition:width 0.3s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">~${pct}% of observed daily capacity</div>
+      </div>`;
+    }
+    // Pay-per-use providers: show spend (today / 7d / 30d)
+    if(!quotaHtml&&(todaySpend>0||weekSpend>0||moSpend>0)){
+      quotaHtml=`<div class="provider-quota">
+        <div style="font-size:11px;display:flex;gap:10px;flex-wrap:wrap">
+          <span>\uD83D\uDCB8 Today: <strong style="color:var(--textStrong)">$${todaySpend.toFixed(2)}</strong></span>
+          <span>7d: <strong style="color:var(--textStrong)">$${weekSpend.toFixed(2)}</strong></span>
+          <span>30d: <strong style="color:var(--textStrong)">$${moSpend.toFixed(2)}</strong></span>
+        </div>
+      </div>`;
+    }
+    // OpenAI also gets spend display below the gauge
+    let spendHtml='';
+    if(id==='openai-codex'&&(todaySpend>0||weekSpend>0||moSpend>0)){
+      spendHtml=`<div style="font-size:11px;display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+        <span>\uD83D\uDCB8 $${todaySpend.toFixed(2)}</span>
+        <span>7d: $${weekSpend.toFixed(2)}</span>
+        <span>30d: $${moSpend.toFixed(2)}</span>
+      </div>`;
     }
     // Alerts: cooldown, rate limits
     let alertHtml='';
@@ -783,7 +809,7 @@ function renderProviders(){
         <span>Today: <strong style="color:var(--textStrong)">${todayCalls}</strong></span>
         <span>7d: <strong style="color:var(--textStrong)">${weekCalls}</strong></span>
       </div>
-      ${quotaHtml}${alertHtml}
+      ${quotaHtml}${spendHtml}${alertHtml}
     </div>`;
   }).join('');
 }

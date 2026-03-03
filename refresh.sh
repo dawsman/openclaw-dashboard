@@ -856,7 +856,10 @@ provider_calls_7d = defaultdict(int)
 provider_calls_all = defaultdict(int)
 provider_spend_today = defaultdict(float)
 provider_spend_7d = defaultdict(float)
+provider_spend_30d = defaultdict(float)
 provider_spend_all = defaultdict(float)
+provider_tokens_today = defaultdict(int)
+provider_tokens_daily = defaultdict(lambda: defaultdict(int))  # provider -> date -> tokens
 
 # Daily cost/token tracking for charts
 daily_costs = defaultdict(lambda: defaultdict(float))  # date -> model -> cost
@@ -969,10 +972,15 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                         bucket[n]['totalTokens'] += t
                         bucket[n]['cost'] += ct
 
+                    # Per-provider daily token tracking
+                    if msg_date:
+                        provider_tokens_daily[provider_id][msg_date] += tt
+
                     if msg_date == today_str:
                         add_bucket(models_today, name, inp, out, cr, tt, cost_total)
                         provider_calls_today[provider_id] += 1
                         provider_spend_today[provider_id] += cost_total
+                        provider_tokens_today[provider_id] += tt
                         if is_subagent:
                             add_bucket(subagent_today, name, inp, out, cr, tt, cost_total)
 
@@ -984,6 +992,7 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                             add_bucket(subagent_7d, name, inp, out, cr, tt, cost_total)
 
                     if msg_date >= date_30d:
+                        provider_spend_30d[provider_id] += cost_total
                         add_bucket(models_30d, name, inp, out, cr, tt, cost_total)
                         if is_subagent:
                             add_bucket(subagent_30d, name, inp, out, cr, tt, cost_total)
@@ -1154,7 +1163,12 @@ output = {
     'providerSpend': {
         'today': {k: round(v, 4) for k, v in provider_spend_today.items() if v > 0},
         '7d': {k: round(v, 4) for k, v in provider_spend_7d.items() if v > 0},
+        '30d': {k: round(v, 4) for k, v in provider_spend_30d.items() if v > 0},
         'all': {k: round(v, 4) for k, v in provider_spend_all.items() if v > 0},
+    },
+    'providerTokens': {
+        'today': dict(provider_tokens_today),
+        'dailyPeak': {pid: max(provider_tokens_daily[pid].values()) if provider_tokens_daily[pid] else 0 for pid in provider_tokens_daily},
     },
 
     # System vitals
