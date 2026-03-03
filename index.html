@@ -1083,10 +1083,23 @@ function setTabCls4(prefix,tab,cls){
 
 // ── Skills + Git Log ──
 function renderSkillsGit(){
-  $('skillsGrid').innerHTML=(D.skills||[]).map(s=>{
-    const c=s.active?'color:var(--green);border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.05)':'color:var(--dim);border-color:var(--border)';
-    return `<span class="skill-tag" style="${c}">${esc(s.name)}</span>`;
-  }).join('')||'<div class="empty">No skills</div>';
+  const allSkills=D.skills||[];
+  if(!allSkills.length){$('skillsGrid').innerHTML='<div class="empty">No skills</div>'}
+  else{
+    // Group by agent
+    const byAgent={};
+    allSkills.forEach(s=>{const a=s.agent||'unknown';(byAgent[a]=byAgent[a]||[]).push(s)});
+    const agentOrder=['main','steward','coder','housekeeper','automator','pm','researcher','scribe','seo','ads','fpl'];
+    const sorted=Object.keys(byAgent).sort((a,b)=>{const ai=agentOrder.indexOf(a),bi=agentOrder.indexOf(b);return (ai<0?99:ai)-(bi<0?99:bi)});
+    $('skillsGrid').innerHTML=sorted.map(agent=>{
+      const name=AGENT_NAME[agent]||agent;
+      const tags=byAgent[agent].map(s=>{
+        const c=s.active?'color:var(--green);border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.05)':'color:var(--dim);border-color:var(--border)';
+        return `<span class="skill-tag" style="${c}">${esc(s.name)}</span>`;
+      }).join('');
+      return `<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;color:var(--textStrong);margin-right:6px">${esc(name)}</span>${tags}</div>`;
+    }).join('');
+  }
   $('gitPanel').innerHTML=(D.gitLog||[]).slice(0,5).map(g=>`<div class="git-item"><span class="git-hash">${esc(g.hash)}</span><span class="git-msg" title="${esc(g.message)}">${esc(g.message)}</span><span class="git-ago">${esc(g.ago)}</span></div>`).join('')||'<div class="empty">No git history</div>';
 }
 

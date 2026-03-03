@@ -384,10 +384,20 @@ if os.path.exists(config_path):
             oc = json.load(cf)
         # Compaction
         compaction_mode = oc.get('agents', {}).get('defaults', {}).get('compaction', {}).get('mode', 'auto')
-        # Skills
-        for name, conf in oc.get('skills', {}).get('entries', {}).items():
-            enabled = conf.get('enabled', True) if isinstance(conf, dict) else True
-            skills.append({'name': name, 'active': enabled, 'type': 'builtin'})
+        # Skills — scan filesystem (skills are file-based, not in openclaw.json)
+        _skill_dirs = [
+            (os.path.join(openclaw_path, 'workspace', 'skills'), 'main'),
+        ]
+        for _ws_agent_dir in glob.glob(os.path.join(openclaw_path, 'workspaces', '*', 'skills')):
+            _agent_id = os.path.basename(os.path.dirname(_ws_agent_dir))
+            _skill_dirs.append((_ws_agent_dir, _agent_id))
+        for _sdir, _agent_id in _skill_dirs:
+            if not os.path.isdir(_sdir):
+                continue
+            for _entry in os.listdir(_sdir):
+                _skill_md = os.path.join(_sdir, _entry, 'SKILL.md')
+                if os.path.isfile(_skill_md):
+                    skills.append({'name': _entry, 'agent': _agent_id, 'active': True})
         # Models
         primary = oc.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', '')
         fallbacks = oc.get('agents', {}).get('defaults', {}).get('model', {}).get('fallbacks', [])
