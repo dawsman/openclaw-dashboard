@@ -73,7 +73,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .alert-msg{font-size:12px;color:var(--text);flex:1}
 
 /* ── Provider grid ── */
-.provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.provider-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px}
 .provider-card{padding:12px;border-left:3px solid var(--dim);position:relative}
 .provider-card.status-ok{border-left-color:var(--green)}
 .provider-card.status-degraded{border-left-color:var(--yellow)}
@@ -284,19 +284,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
   .grid-2,.grid-3{grid-template-columns:1fr}
   .two-col{grid-template-columns:1fr}
   .agent-grid{grid-template-columns:repeat(4,1fr)}
-  .provider-grid{grid-template-columns:1fr 1fr}
   .chat-panel{width:calc(100vw - 32px);right:16px;bottom:76px}
 }
 @media(min-width:768px){
   body{padding:20px}
   .top-row{flex-direction:row;align-items:center;justify-content:space-between}
   .two-col{grid-template-columns:1fr 1fr}
-  .provider-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  .provider-grid{grid-template-columns:repeat(5,1fr)}
   .agent-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
 }
 @media(max-width:480px){
   .agent-grid{grid-template-columns:repeat(3,1fr)}
-  .provider-grid{grid-template-columns:1fr}
+  .provider-grid{grid-template-columns:repeat(2,1fr)}
   .actions-bar{flex-direction:column}
   .action-dropdown{width:100%}
   .action-dropdown select{flex:1}
@@ -353,19 +352,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 <!-- 2. Alerts Banner -->
 <div class="alerts-section" id="alertsSection"></div>
 
-<!-- 3. Provider Status + Agent Cards (side by side on desktop) -->
-<div class="two-col" id="providerAgentRow">
-  <div>
-    <div class="section-header"><span class="section-title">&#x1F4E1; Provider Status</span></div>
-    <div class="provider-grid" id="providerGrid"></div>
-  </div>
-  <div>
-    <div class="section-header"><span class="section-title">&#x1F916; Agents</span><span class="section-count" id="agentCount"></span></div>
-    <div class="agent-grid" id="agentGrid"></div>
-  </div>
-</div>
+<!-- 3. Provider Status (full-width row) -->
+<div class="section-header"><span class="section-title">&#x1F4E1; Provider Status</span></div>
+<div class="provider-grid" id="providerGrid"></div>
 
-<!-- 4. System Vitals -->
+<!-- 4. Agent Cards (full-width row below providers) -->
+<div class="section-header"><span class="section-title">&#x1F916; Agents</span><span class="section-count" id="agentCount"></span></div>
+<div class="agent-grid" id="agentGrid"></div>
+
+<!-- 5. System Vitals -->
 <div class="vitals-row" id="vitalsRow">
   <div class="glass vital-item">
     <div class="vital-icon">&#x1F321;&#xFE0F;</div>
