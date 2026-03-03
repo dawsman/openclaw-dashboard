@@ -306,6 +306,73 @@ try:
 except Exception as _e:
     import sys; print(f"[dashboard warn] openrouter api: {_e}", file=sys.stderr)
 
+# ── MCP Servers ──
+mcp_servers = []
+try:
+    mcporter_path = os.path.expanduser('~/.mcporter/mcporter.json')
+    if os.path.exists(mcporter_path):
+        with open(mcporter_path) as _f:
+            mcporter = json.load(_f)
+        servers_cfg = mcporter.get('mcpServers', {})
+
+        # Parse smoke test log for latest failures
+        # Format: "2026-03-03 06:00:15 | Failures: librecrawl-mcp"
+        smoke_failures = set()
+        smoke_log = os.path.expanduser('~/logs/mcp-smoke-test.log')
+        if os.path.exists(smoke_log):
+            with open(smoke_log) as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if 'passed' in _line and 'failed' in _line:
+                        smoke_failures = set()  # Reset on new run summary
+                    elif '| Failures:' in _line:
+                        names = _line.split('| Failures:')[1].strip()
+                        for n in names.split(','):
+                            n = n.strip().replace('-mcp', '')  # Normalize to mcporter names
+                            if n: smoke_failures.add(n)
+
+        # Check persistent SSE services
+        persistent_status = {}
+        for svc_name in ['fantasy-pl-mcp', 'google-analytics-mcp']:
+            try:
+                _r = subprocess.run(['systemctl', '--user', 'is-active', svc_name],
+                    capture_output=True, text=True, timeout=3)
+                is_active = _r.stdout.strip() == 'active'
+                persistent_status[svc_name] = 'ok' if is_active else 'down'
+            except Exception:
+                persistent_status[svc_name] = 'unknown'
+
+        for name, cfg in sorted(servers_cfg.items()):
+            srv = {'name': name}
+            # Determine type: SSE vs stdio
+            if cfg.get('baseUrl'):
+                srv['type'] = 'sse'
+                srv['url'] = cfg['baseUrl']
+            elif cfg.get('command'):
+                cmd = cfg['command']
+                if 'containers/' in cmd or 'run.sh' in cmd:
+                    srv['type'] = 'container'
+                elif 'npx' in cmd or 'node' in cmd:
+                    srv['type'] = 'node'
+                elif 'python' in cmd or 'uvx' in cmd:
+                    srv['type'] = 'python'
+                else:
+                    srv['type'] = 'stdio'
+            else:
+                srv['type'] = 'unknown'
+
+            # Status: persistent services get systemd check, containers get smoke test
+            if name in persistent_status:
+                srv['status'] = persistent_status[name]
+            elif name in smoke_failures:
+                srv['status'] = 'error'
+            else:
+                srv['status'] = 'ok'  # Assume ok if no negative signal
+
+            mcp_servers.append(srv)
+except Exception as _e:
+    import sys; print(f"[dashboard warn] mcp servers: {_e}", file=sys.stderr)
+
 # ── OpenClaw config ──
 skills = []
 available_models = []
@@ -1245,6 +1312,9 @@ output = {
     'availableModels': available_models,
     'agentConfig': agent_config,
     'skills': skills,
+
+    # MCP Servers
+    'mcpServers': mcp_servers,
 
     # Git log
     'gitLog': git_log,

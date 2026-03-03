@@ -97,6 +97,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .agent-dot.active{background:var(--green);box-shadow:0 0 6px rgba(74,222,128,.5)}
 .agent-dot.idle{background:var(--dim)}
 
+/* ── MCP grid ── */
+.mcp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:16px}
+.mcp-card{padding:6px 4px;text-align:center;position:relative;min-width:0}
+.mcp-name{font-size:9px;font-weight:700;color:var(--textStrong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcp-type{font-size:8px;color:var(--dim);margin-top:1px}
+.mcp-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
+.mcp-dot.s-ok{background:var(--green)}
+.mcp-dot.s-error{background:var(--red)}
+.mcp-dot.s-down{background:var(--red)}
+.mcp-dot.s-unknown{background:var(--dim)}
+
 /* ── Vitals row ── */
 .vitals-row{display:flex;gap:10px;margin-bottom:16px;justify-content:center}
 .vital-item{flex:1;text-align:center;padding:12px 8px;max-width:200px}
@@ -288,6 +299,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
   .agent-grid::-webkit-scrollbar{height:3px}
   .agent-grid::-webkit-scrollbar-thumb{background:var(--scrollThumb);border-radius:3px}
   .agent-card{min-width:68px;flex-shrink:0}
+  .mcp-grid{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .mcp-grid::-webkit-scrollbar{height:3px}
+  .mcp-grid::-webkit-scrollbar-thumb{background:var(--scrollThumb);border-radius:3px}
+  .mcp-card{min-width:80px;flex-shrink:0}
   .chat-panel{width:calc(100vw - 32px);right:16px;bottom:76px}
 }
 @media(min-width:768px){
@@ -363,7 +378,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 <div class="section-header"><span class="section-title">&#x1F916; Agents</span><span class="section-count" id="agentCount"></span></div>
 <div class="agent-grid" id="agentGrid"></div>
 
-<!-- 5. System Vitals -->
+<!-- 5. MCP Servers -->
+<div class="section-header"><span class="section-title">&#x1F50C; MCP Servers</span><span class="section-count" id="mcpCount"></span></div>
+<div class="mcp-grid" id="mcpGrid"></div>
+
+<!-- 6. System Vitals -->
 <div class="vitals-row" id="vitalsRow">
   <div class="glass vital-item">
     <div class="vital-icon">&#x1F321;&#xFE0F;</div>
@@ -688,6 +707,7 @@ function render(){
   renderAlerts();
   renderProviders();
   renderAgents();
+  renderMcp();
   renderVitals();
   renderFeed();
   renderErrors();
@@ -843,6 +863,24 @@ function renderAgents(){
       <div class="agent-id">${esc(a.id)}</div>
       <div class="agent-model">${esc(modelShort)}</div>
       <div class="agent-last">${isActive?'active':lastLabel}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── MCP Servers ──
+const MCP_TYPE_LABEL={sse:'SSE',container:'Container',node:'Node',python:'Python',stdio:'Stdio',unknown:'—'};
+function renderMcp(){
+  const servers=D.mcpServers||[];
+  $('mcpCount').textContent=servers.length+' servers';
+  if(!servers.length){$('mcpGrid').innerHTML='<div class="empty">No MCP servers</div>';return}
+  $('mcpGrid').innerHTML=servers.map(s=>{
+    const st=s.status||'unknown';
+    const dotCls='s-'+st;
+    const label=MCP_TYPE_LABEL[s.type]||s.type;
+    const shortName=(s.name||'').replace(/-mcp$/,'');
+    return `<div class="glass mcp-card">
+      <div><span class="mcp-dot ${dotCls}"></span><span class="mcp-name">${esc(shortName)}</span></div>
+      <div class="mcp-type">${esc(label)}</div>
     </div>`;
   }).join('');
 }
