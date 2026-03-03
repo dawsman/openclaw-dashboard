@@ -92,6 +92,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .agent-emoji{font-size:20px;display:block;margin-bottom:4px}
 .agent-id{font-size:11px;font-weight:700;color:var(--textStrong)}
 .agent-model{font-size:9px;color:var(--dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-last{font-size:8px;color:var(--muted);margin-top:2px}
 .agent-dot{width:6px;height:6px;border-radius:50%;position:absolute;top:8px;right:8px}
 .agent-dot.active{background:var(--green);box-shadow:0 0 6px rgba(74,222,128,.5)}
 .agent-dot.idle{background:var(--dim)}
@@ -820,20 +821,23 @@ function renderAgents(){
   const now=Date.now();
   $('agentGrid').innerHTML=agents.map(a=>{
     const emoji=AGENT_ICON_MAP[a.id]||'\uD83E\uDD16';
-    const modelShort=((a.model||'').split('/').pop()||'--').split('-').slice(0,2).join('-');
-    // Check if any session for this agent was updated < 30min
-    const isActive=sessions.some(s=>{
-      const agMatch=(s.name||'').toLowerCase().includes(a.id);
-      if(!agMatch)return false;
-      if(!s.updatedAt)return false;
-      const upd=new Date(s.updatedAt).getTime();
-      return (now-upd)<1800000;
+    const raw=(a.model||'').split('/').pop()||'--';
+    const modelShort=raw.replace(/^gpt-(\d+\.\d+)/,'gpt-$1').replace(/^(gpt-\d+\.\d+)-codex.*/,'$1-codex').replace(/^(gpt-\d+\.\d+)(?!-codex).*$/,'$1');
+    // Find most recent session for this agent
+    let lastTs=0;
+    sessions.forEach(s=>{
+      if(!(s.name||'').toLowerCase().includes(a.id))return;
+      const upd=s.updatedAt?new Date(s.updatedAt).getTime():0;
+      if(upd>lastTs)lastTs=upd;
     });
+    const isActive=lastTs>0&&(now-lastTs)<1800000;
+    const lastLabel=lastTs>0?relTime(lastTs):'--';
     return `<div class="glass agent-card">
       <div class="agent-dot ${isActive?'active':'idle'}"></div>
       <span class="agent-emoji">${emoji}</span>
       <div class="agent-id">${esc(a.id)}</div>
       <div class="agent-model">${esc(modelShort)}</div>
+      <div class="agent-last">${isActive?'active':lastLabel}</div>
     </div>`;
   }).join('');
 }
