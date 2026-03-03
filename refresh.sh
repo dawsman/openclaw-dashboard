@@ -147,18 +147,138 @@ for pid, agg in provider_agg.items():
         'lastUsed': agg['lastUsed'],
     }
 
-# Add github-copilot entry from token file
+# Merge github-copilot auth-profiles data with token file
 if copilot_token_info:
-    expired = copilot_token_info['expiresAt'] < now_ms if copilot_token_info.get('expiresAt') else False
+    existing = provider_status.get('github-copilot', {})
+    token_expires = copilot_token_info.get('expiresAt', 0)
+    # Token refreshes every ~30min; only flag "down" if not refreshed in >2h
+    stale_token = (now_ms - copilot_token_info.get('updatedAt', 0)) > 7200000 and token_expires < now_ms
     provider_status['github-copilot'] = {
-        'status': 'down' if expired else 'ok',
-        'errorCount': 0,
-        'rateLimitCount': 0,
-        'lastFailureAt': 0,
-        'cooldownUntil': 0,
-        'lastUsed': copilot_token_info.get('updatedAt', 0),
-        'tokenExpiresAt': copilot_token_info.get('expiresAt', 0),
+        'status': 'down' if stale_token else existing.get('status', 'ok'),
+        'errorCount': existing.get('errorCount', 0),
+        'rateLimitCount': existing.get('rateLimitCount', 0),
+        'lastFailureAt': existing.get('lastFailureAt', 0),
+        'cooldownUntil': existing.get('cooldownUntil', 0),
+        'lastUsed': max(copilot_token_info.get('updatedAt', 0), existing.get('lastUsed', 0)),
     }
+
+# Provider metadata — descriptions, types, and quota info
+PROVIDER_META = {
+    'github-copilot': {
+        'providerType': 'subscription',
+        'plan': 'Copilot Pro',
+        'monthlyPremiumLimit': 300,
+        'description': 'GitHub Copilot Pro subscription',
+    },
+    'openai-codex': {
+        'providerType': 'subscription',
+        'plan': 'ChatGPT OWALF',
+        'description': 'ChatGPT OAuth subscription (OWALF)',
+    },
+    'kimi-coding': {
+        'providerType': 'subscription',
+        'plan': 'Kimi Code',
+        'description': 'Kimi Code subscription (Moonshot AI)',
+    },
+    'openrouter': {
+        'providerType': 'credits',
+        'description': 'OpenRouter pay-as-you-go',
+    },
+    'anthropic': {
+        'providerType': 'api_key',
+        'description': 'Anthropic API key',
+    },
+}
+
+# GitHub Copilot premium request multipliers
+COPILOT_MULTIPLIERS = {
+    'opus-4.6': 3, 'opus-4.5': 3,
+    'sonnet-4': 1, 'sonnet-4.5': 1, 'sonnet-4.6': 1,
+    'haiku-4.5': 0.33,
+    'gpt-5.1': 1, 'gpt-5.1-codex': 1, 'gpt-5.1-codex-mini': 0.33,
+    'gpt-5.2': 1, 'gpt-5.2-codex': 1, 'gpt-5.3-codex': 1,
+    'gemini-2.5-pro': 1, 'gemini-flash-3': 0.33, 'gemini-3-flash': 0.33,
+    'gemini-3-pro': 1, 'gemini-3.1-pro': 1,
+    'gpt-4.1': 0, 'gpt-4o': 0, 'gpt-5-mini': 0,
+}
+
+# Calculate Copilot premium requests consumed this month
+month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime('%Y-%m-%dT00:00:00')
+copilot_premium_used = 0
+copilot_model_calls = {}  # model -> {calls, premium}
+for _f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')):
+    _sess_provider = 'unknown'
+    try:
+        with open(_f) as _fh:
+            for _line in _fh:
+                try:
+                    _obj = json.loads(_line)
+                    if _obj.get('type') == 'model_change' and _obj.get('provider'):
+                        _sess_provider = _obj['provider']
+                    _msg = _obj.get('message', {})
+                    if _msg.get('role') != 'assistant': continue
+                    if _msg.get('usage', {}).get('totalTokens', 0) == 0: continue
+                    if _sess_provider != 'github-copilot': continue
+                    _ts = _obj.get('timestamp', '')
+                    if _ts < month_start: continue
+                    _model = _msg.get('model', 'unknown')
+                    _mult = COPILOT_MULTIPLIERS.get(_model, 1)
+                    copilot_premium_used += _mult
+                    if _model not in copilot_model_calls:
+                        copilot_model_calls[_model] = {'calls': 0, 'premium': 0}
+                    copilot_model_calls[_model]['calls'] += 1
+                    copilot_model_calls[_model]['premium'] += _mult
+                except (json.JSONDecodeError, ValueError):
+                    continue
+    except (FileNotFoundError, PermissionError, OSError):
+        pass
+
+# Add computed fields to all providers
+for pid, pdata in provider_status.items():
+    meta = PROVIDER_META.get(pid, {})
+    pdata['providerType'] = meta.get('providerType', 'unknown')
+    pdata['plan'] = meta.get('plan', '')
+    pdata['description'] = meta.get('description', '')
+    # Cooldown remaining
+    if pdata.get('cooldownUntil', 0) > now_ms:
+        pdata['cooldownRemainingMs'] = pdata['cooldownUntil'] - now_ms
+    # Copilot premium requests
+    if pid == 'github-copilot':
+        limit = meta.get('monthlyPremiumLimit', 300)
+        pdata['premiumUsed'] = int(copilot_premium_used)
+        pdata['premiumLimit'] = limit
+        pdata['premiumRemaining'] = max(0, limit - int(copilot_premium_used))
+        pdata['premiumModels'] = copilot_model_calls
+
+# ── OpenRouter credits ──
+if 'openrouter' in provider_status:
+    try:
+        import urllib.request
+        or_key = None
+        for ap_file in glob.glob(os.path.join(base, '*/agent/auth-profiles.json')):
+            try:
+                with open(ap_file) as _f:
+                    _ap = json.load(_f)
+                _k = _ap.get('profiles', {}).get('openrouter:default', {}).get('key')
+                if _k:
+                    or_key = _k
+                    break
+            except Exception:
+                pass
+        if or_key:
+            req = urllib.request.Request(
+                'https://openrouter.ai/api/v1/credits',
+                headers={'Authorization': f'Bearer {or_key}'}
+            )
+            resp = urllib.request.urlopen(req, timeout=10)
+            cdata = json.loads(resp.read().decode())
+            total = cdata.get('data', {}).get('total_credits', 0)
+            used = cdata.get('data', {}).get('total_usage', 0)
+            provider_status['openrouter']['creditsTotal'] = round(total, 2)
+            provider_status['openrouter']['creditsUsed'] = round(used, 2)
+            provider_status['openrouter']['creditsRemaining'] = round(max(0, total - used), 2)
+    except Exception as _e:
+        import sys; print(f"[dashboard warn] openrouter credits: {_e}", file=sys.stderr)
 
 # ── OpenClaw config ──
 skills = []
@@ -773,11 +893,19 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
     session_last_ts = None
     session_task = session_key or sid[:12]
 
+    session_provider = 'unknown'  # Track provider from model_change events
+
     try:
         with open(f) as fh:
             for line in fh:
                 try:
                     obj = json.loads(line)
+
+                    # Track provider from model_change events
+                    if obj.get('type') == 'model_change' and obj.get('provider'):
+                        session_provider = obj['provider']
+                        continue
+
                     msg = obj.get('message', {})
                     if msg.get('role') != 'assistant': continue
                     usage = msg.get('usage', {})
@@ -786,7 +914,7 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                     if 'delivery-mirror' in model: continue
 
                     name = model_name(model)
-                    provider_id = model.split('/')[0] if '/' in model else 'unknown'
+                    provider_id = model.split('/')[0] if '/' in model else session_provider
                     cost_total = usage.get('cost',{}).get('total',0) if isinstance(usage.get('cost'),dict) else 0
                     if cost_total < 0: cost_total = 0  # Skip corrupted negative costs
                     inp = usage.get('input',0)

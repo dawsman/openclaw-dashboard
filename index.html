@@ -83,6 +83,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .provider-status{display:flex;align-items:center;gap:5px;font-size:11px;margin-top:4px}
 .provider-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:11px;color:var(--muted)}
 .provider-stats span{white-space:nowrap}
+.provider-quota{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .provider-extra{font-size:10px;color:var(--dim);margin-top:4px}
 
 /* ── Agent grid ── */
@@ -721,22 +722,63 @@ function renderProviders(){
     const col=STATUS_COLOR[st]||'var(--dim)';
     const todayCalls=(pc.today&&pc.today[id])||0;
     const weekCalls=(pc['7d']&&pc['7d'][id])||0;
-    let extra='';
+    const plan=p.plan||p.providerType||'';
+    let quotaHtml='';
+    // GitHub Copilot: show premium requests used / limit
+    if(id==='github-copilot'&&p.premiumLimit){
+      const used=p.premiumUsed||0;
+      const limit=p.premiumLimit;
+      const rem=p.premiumRemaining||0;
+      const pct=Math.round(used/limit*100);
+      const barCol=pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)';
+      quotaHtml=`<div class="provider-quota">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+          <span>Premium requests</span><span style="color:var(--textStrong)">${used}/${limit}</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px;transition:width 0.3s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${rem} remaining this month</div>
+      </div>`;
+    }
+    // OpenRouter: show credit balance
+    if(id==='openrouter'&&p.creditsTotal!=null){
+      const rem=p.creditsRemaining||0;
+      const total=p.creditsTotal||0;
+      const used=p.creditsUsed||0;
+      const pct=total>0?Math.round(used/total*100):100;
+      const barCol=rem<=1?'var(--red)':rem<=10?'var(--yellow)':'var(--green)';
+      quotaHtml=`<div class="provider-quota">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+          <span>Credits</span><span style="color:var(--textStrong)">$${rem.toFixed(2)} left</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px;transition:width 0.3s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">$${used.toFixed(2)} of $${total.toFixed(2)} used</div>
+      </div>`;
+    }
+    // Kimi: show cooldown info prominently
+    let alertHtml='';
     if(p.cooldownRemainingMs){
       const mins=Math.ceil(p.cooldownRemainingMs/60000);
-      extra=`<div class="provider-extra" style="color:var(--orange)">Cooldown: ${mins}m remaining</div>`;
-    } else if(p.tokenRemainingDays!=null){
-      extra=`<div class="provider-extra">Token expires in ${p.tokenRemainingDays}d</div>`;
+      alertHtml=`<div style="background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--orange);margin-top:4px">\u23F1 Cooldown: ${mins}m remaining</div>`;
+    }
+    if(p.rateLimitCount>0){
+      alertHtml+=`<div style="font-size:11px;color:var(--orange);margin-top:2px">\u26A0 ${p.rateLimitCount} rate limit hits</div>`;
     }
     return `<div class="glass provider-card status-${esc(st)}">
       <div class="provider-name">${info.icon} ${esc(info.name)}</div>
-      <div class="provider-status"><span class="dot" style="background:${col};width:8px;height:8px"></span><span style="color:${col}">${esc(st)}</span></div>
+      <div style="display:flex;align-items:center;gap:6px;margin:2px 0">
+        <span class="dot" style="background:${col};width:8px;height:8px"></span>
+        <span style="color:${col};font-size:12px;font-weight:600">${esc(st.charAt(0).toUpperCase()+st.slice(1))}</span>
+        <span style="font-size:10px;color:var(--dim);margin-left:auto">${esc(plan)}</span>
+      </div>
       <div class="provider-stats">
         <span>Today: <strong style="color:var(--textStrong)">${todayCalls}</strong></span>
         <span>7d: <strong style="color:var(--textStrong)">${weekCalls}</strong></span>
-        ${p.rateLimitCount?`<span style="color:var(--orange)">RL: ${p.rateLimitCount}</span>`:''}
       </div>
-      ${extra}
+      ${quotaHtml}${alertHtml}
     </div>`;
   }).join('');
 }
