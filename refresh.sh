@@ -281,6 +281,31 @@ for pid, pdata in provider_status.items():
         pdata['premiumRemaining'] = max(0, limit - int(copilot_premium_used))
         pdata['premiumModels'] = copilot_model_calls
 
+# OpenRouter live usage from API (JSONL doesn't track OR costs)
+try:
+    env_path = os.path.expanduser('~/.openclaw/.env')
+    or_key = ''
+    if os.path.exists(env_path):
+        for _line in open(env_path):
+            if _line.startswith('OPENROUTER_API_KEY='):
+                or_key = _line.split('=', 1)[1].strip().strip('"').strip("'")
+                break
+    if or_key:
+        import urllib.request
+        _req = urllib.request.Request('https://openrouter.ai/api/v1/auth/key',
+            headers={'Authorization': f'Bearer {or_key}'})
+        with urllib.request.urlopen(_req, timeout=5) as _resp:
+            _or = json.loads(_resp.read()).get('data', {})
+        or_status = provider_status.get('openrouter', {})
+        or_status['apiUsageTotal'] = round(_or.get('usage', 0), 4)
+        or_status['apiUsageDaily'] = round(_or.get('usage_daily', 0), 4)
+        or_status['apiUsageWeekly'] = round(_or.get('usage_weekly', 0), 4)
+        or_status['apiUsageMonthly'] = round(_or.get('usage_monthly', 0), 4)
+        or_status['dailyLimit'] = _or.get('limit', 0)
+        or_status['dailyRemaining'] = _or.get('limit_remaining', 0)
+except Exception as _e:
+    import sys; print(f"[dashboard warn] openrouter api: {_e}", file=sys.stderr)
+
 # ── OpenClaw config ──
 skills = []
 available_models = []

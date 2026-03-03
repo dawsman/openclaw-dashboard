@@ -764,12 +764,28 @@ function renderProviders(){
         <div style="font-size:10px;color:var(--muted);margin-top:2px">~${pct}% of observed daily capacity</div>
       </div>`;
     }
-    // Spend row: always show for all providers
-    const spendHtml=`<div style="font-size:11px;display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
-      <span>Today: <strong style="color:var(--textStrong)">$${todaySpend.toFixed(2)}</strong></span>
-      <span>7d: <strong style="color:var(--textStrong)">$${weekSpend.toFixed(2)}</strong></span>
-      <span>30d: <strong style="color:var(--textStrong)">$${moSpend.toFixed(2)}</strong></span>
-    </div>`;
+    // Spend row — OpenRouter uses live API data, others use JSONL
+    let spendHtml='';
+    if(id==='openrouter'){
+      const dSpend=p.apiUsageDaily||0;
+      const wSpend=p.apiUsageWeekly||0;
+      const mSpend=p.apiUsageMonthly||0;
+      const total=p.apiUsageTotal||0;
+      const lim=p.dailyLimit||0;
+      const rem=p.dailyRemaining||0;
+      spendHtml=`<div style="font-size:11px;display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+        <span>Today: <strong style="color:var(--textStrong)">$${dSpend.toFixed(2)}</strong></span>
+        <span>7d: <strong style="color:var(--textStrong)">$${wSpend.toFixed(2)}</strong></span>
+        <span>30d: <strong style="color:var(--textStrong)">$${mSpend.toFixed(2)}</strong></span>
+      </div>`;
+      if(lim>0) spendHtml+=`<div style="font-size:10px;color:var(--muted);margin-top:2px">${rem}/${lim} daily reqs remaining &middot; $${total.toFixed(2)} all-time</div>`;
+    } else {
+      spendHtml=`<div style="font-size:11px;display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+        <span>Today: <strong style="color:var(--textStrong)">$${todaySpend.toFixed(2)}</strong></span>
+        <span>7d: <strong style="color:var(--textStrong)">$${weekSpend.toFixed(2)}</strong></span>
+        <span>30d: <strong style="color:var(--textStrong)">$${moSpend.toFixed(2)}</strong></span>
+      </div>`;
+    }
     // Alerts: cooldown, rate limits
     let alertHtml='';
     if(p.cooldownRemainingMs){
