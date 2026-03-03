@@ -710,7 +710,8 @@ function renderProviders(){
   const pc=D.providerCalls||{};
   const sp=D.providerSpend||{};
   const pt=D.providerTokens||{};
-  const ids=Object.keys(ps);
+  const PROVIDER_ORDER=['github-copilot','openai-codex','kimi-coding','openrouter','anthropic'];
+  const ids=PROVIDER_ORDER.filter(id=>ps[id]).concat(Object.keys(ps).filter(id=>!PROVIDER_ORDER.includes(id)));
   if(!ids.length){$('providerGrid').innerHTML='<div class="empty">No provider data</div>';return}
   $('providerGrid').innerHTML=ids.map(id=>{
     const p=ps[id]||{};
