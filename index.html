@@ -100,7 +100,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 /* ── MCP grid ── */
 .mcp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:16px}
 .mcp-card{padding:6px 4px;text-align:center;position:relative;min-width:0}
-.mcp-name{font-size:9px;font-weight:700;color:var(--textStrong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcp-name{font-size:9px;font-weight:700;color:var(--textStrong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;max-width:calc(100% - 12px);vertical-align:middle}
 .mcp-type{font-size:8px;color:var(--dim);margin-top:1px}
 .mcp-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px;vertical-align:middle}
 .mcp-dot.s-ok{background:var(--green)}
