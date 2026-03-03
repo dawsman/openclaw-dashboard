@@ -233,15 +233,44 @@ for _f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')):
     except (FileNotFoundError, PermissionError, OSError):
         pass
 
+# Determine each provider's role from openclaw.json
+provider_roles = {}  # pid -> 'primary' | 'fallback' | 'inactive'
+try:
+    with open(config_path) as _cf:
+        _oc_roles = json.load(_cf)
+    _def_primary = _oc_roles.get('agents', {}).get('defaults', {}).get('model', {}).get('primary', '')
+    _def_primary_pid = _def_primary.split('/')[0] if '/' in _def_primary else ''
+    if _def_primary_pid:
+        provider_roles[_def_primary_pid] = 'primary'
+    _def_fbs = _oc_roles.get('agents', {}).get('defaults', {}).get('model', {}).get('fallbacks', [])
+    for _fb in (_def_fbs if isinstance(_def_fbs, list) else []):
+        _fb_str = _fb.get('model', '') if isinstance(_fb, dict) else str(_fb)
+        _fb_pid = _fb_str.split('/')[0] if '/' in _fb_str else ''
+        if _fb_pid and _fb_pid not in provider_roles:
+            provider_roles[_fb_pid] = 'fallback'
+    # Check agent-specific overrides
+    for _aname, _acfg in _oc_roles.get('agents', {}).items():
+        if _aname == 'defaults' or not isinstance(_acfg, dict): continue
+        _ap = _acfg.get('model', {}).get('primary', '')
+        _ap_pid = _ap.split('/')[0] if '/' in _ap else ''
+        if _ap_pid and _ap_pid not in provider_roles:
+            provider_roles[_ap_pid] = 'primary'
+except Exception:
+    pass
+
 # Add computed fields to all providers
 for pid, pdata in provider_status.items():
     meta = PROVIDER_META.get(pid, {})
     pdata['providerType'] = meta.get('providerType', 'unknown')
     pdata['plan'] = meta.get('plan', '')
     pdata['description'] = meta.get('description', '')
-    # Cooldown remaining
-    if pdata.get('cooldownUntil', 0) > now_ms:
-        pdata['cooldownRemainingMs'] = pdata['cooldownUntil'] - now_ms
+    pdata['role'] = provider_roles.get(pid, 'configured')
+    # Cooldown remaining vs expired
+    cd = pdata.get('cooldownUntil', 0)
+    if cd > now_ms:
+        pdata['cooldownRemainingMs'] = cd - now_ms
+    elif cd > 0:
+        pdata['cooldownExpired'] = True  # Cooldown has expired, provider ready
     # Copilot premium requests
     if pid == 'github-copilot':
         limit = meta.get('monthlyPremiumLimit', 300)
@@ -249,36 +278,6 @@ for pid, pdata in provider_status.items():
         pdata['premiumLimit'] = limit
         pdata['premiumRemaining'] = max(0, limit - int(copilot_premium_used))
         pdata['premiumModels'] = copilot_model_calls
-
-# ── OpenRouter credits ──
-if 'openrouter' in provider_status:
-    try:
-        import urllib.request
-        or_key = None
-        for ap_file in glob.glob(os.path.join(base, '*/agent/auth-profiles.json')):
-            try:
-                with open(ap_file) as _f:
-                    _ap = json.load(_f)
-                _k = _ap.get('profiles', {}).get('openrouter:default', {}).get('key')
-                if _k:
-                    or_key = _k
-                    break
-            except Exception:
-                pass
-        if or_key:
-            req = urllib.request.Request(
-                'https://openrouter.ai/api/v1/credits',
-                headers={'Authorization': f'Bearer {or_key}'}
-            )
-            resp = urllib.request.urlopen(req, timeout=10)
-            cdata = json.loads(resp.read().decode())
-            total = cdata.get('data', {}).get('total_credits', 0)
-            used = cdata.get('data', {}).get('total_usage', 0)
-            provider_status['openrouter']['creditsTotal'] = round(total, 2)
-            provider_status['openrouter']['creditsUsed'] = round(used, 2)
-            provider_status['openrouter']['creditsRemaining'] = round(max(0, total - used), 2)
-    except Exception as _e:
-        import sys; print(f"[dashboard warn] openrouter credits: {_e}", file=sys.stderr)
 
 # ── OpenClaw config ──
 skills = []
@@ -855,6 +854,9 @@ subagent_30d = defaultdict(new_bucket)
 provider_calls_today = defaultdict(int)
 provider_calls_7d = defaultdict(int)
 provider_calls_all = defaultdict(int)
+provider_spend_today = defaultdict(float)
+provider_spend_7d = defaultdict(float)
+provider_spend_all = defaultdict(float)
 
 # Daily cost/token tracking for charts
 daily_costs = defaultdict(lambda: defaultdict(float))  # date -> model -> cost
@@ -923,6 +925,7 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                     tt = usage.get('totalTokens',0)
 
                     provider_calls_all[provider_id] += 1
+                    provider_spend_all[provider_id] += cost_total
                     models_all[name]['calls'] += 1
                     models_all[name]['input'] += inp
                     models_all[name]['output'] += out
@@ -969,12 +972,14 @@ for f in glob.glob(os.path.join(base, '*/sessions/*.jsonl')) + glob.glob(os.path
                     if msg_date == today_str:
                         add_bucket(models_today, name, inp, out, cr, tt, cost_total)
                         provider_calls_today[provider_id] += 1
+                        provider_spend_today[provider_id] += cost_total
                         if is_subagent:
                             add_bucket(subagent_today, name, inp, out, cr, tt, cost_total)
 
                     if msg_date >= date_7d:
                         add_bucket(models_7d, name, inp, out, cr, tt, cost_total)
                         provider_calls_7d[provider_id] += 1
+                        provider_spend_7d[provider_id] += cost_total
                         if is_subagent:
                             add_bucket(subagent_7d, name, inp, out, cr, tt, cost_total)
 
@@ -1145,6 +1150,11 @@ output = {
         'today': dict(provider_calls_today),
         '7d': dict(provider_calls_7d),
         'all': dict(provider_calls_all),
+    },
+    'providerSpend': {
+        'today': {k: round(v, 4) for k, v in provider_spend_today.items() if v > 0},
+        '7d': {k: round(v, 4) for k, v in provider_spend_7d.items() if v > 0},
+        'all': {k: round(v, 4) for k, v in provider_spend_all.items() if v > 0},
     },
 
     # System vitals

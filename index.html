@@ -713,6 +713,7 @@ function renderAlerts(){
 function renderProviders(){
   const ps=D.providerStatus||{};
   const pc=D.providerCalls||{};
+  const sp=D.providerSpend||{};
   const ids=Object.keys(ps);
   if(!ids.length){$('providerGrid').innerHTML='<div class="empty">No provider data</div>';return}
   $('providerGrid').innerHTML=ids.map(id=>{
@@ -722,9 +723,13 @@ function renderProviders(){
     const col=STATUS_COLOR[st]||'var(--dim)';
     const todayCalls=(pc.today&&pc.today[id])||0;
     const weekCalls=(pc['7d']&&pc['7d'][id])||0;
-    const plan=p.plan||p.providerType||'';
+    const todaySpend=(sp.today&&sp.today[id])||0;
+    const weekSpend=(sp['7d']&&sp['7d'][id])||0;
+    const role=p.role||'';
+    const plan=p.plan||'';
+    const roleBadge=role==='primary'?'\uD83D\uDFE2':role==='fallback'?'\uD83D\uDD36':'';
     let quotaHtml='';
-    // GitHub Copilot: show premium requests used / limit
+    // GitHub Copilot: show premium requests used / limit with progress bar
     if(id==='github-copilot'&&p.premiumLimit){
       const used=p.premiumUsed||0;
       const limit=p.premiumLimit;
@@ -733,7 +738,7 @@ function renderProviders(){
       const barCol=pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)';
       quotaHtml=`<div class="provider-quota">
         <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-          <span>Premium requests</span><span style="color:var(--textStrong)">${used}/${limit}</span>
+          <span>Premium reqs</span><span style="color:var(--textStrong)">${used} / ${limit}</span>
         </div>
         <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px;transition:width 0.3s"></div>
@@ -741,38 +746,38 @@ function renderProviders(){
         <div style="font-size:10px;color:var(--muted);margin-top:2px">${rem} remaining this month</div>
       </div>`;
     }
-    // OpenRouter: show credit balance
-    if(id==='openrouter'&&p.creditsTotal!=null){
-      const rem=p.creditsRemaining||0;
-      const total=p.creditsTotal||0;
-      const used=p.creditsUsed||0;
-      const pct=total>0?Math.round(used/total*100):100;
-      const barCol=rem<=1?'var(--red)':rem<=10?'var(--yellow)':'var(--green)';
-      quotaHtml=`<div class="provider-quota">
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-          <span>Credits</span><span style="color:var(--textStrong)">$${rem.toFixed(2)} left</span>
-        </div>
-        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px;transition:width 0.3s"></div>
-        </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px">$${used.toFixed(2)} of $${total.toFixed(2)} used</div>
-      </div>`;
+    // Pay-per-use providers (OpenRouter etc): show spend
+    if(p.providerType==='credits'||(todaySpend>0||weekSpend>0)){
+      const hasSpend=todaySpend>0||weekSpend>0;
+      if(hasSpend&&!quotaHtml){
+        quotaHtml=`<div class="provider-quota">
+          <div style="font-size:11px;display:flex;gap:12px">
+            <span>\uD83D\uDCB8 Today: <strong style="color:var(--textStrong)">$${todaySpend.toFixed(2)}</strong></span>
+            <span>7d: <strong style="color:var(--textStrong)">$${weekSpend.toFixed(2)}</strong></span>
+          </div>
+        </div>`;
+      }
     }
-    // Kimi: show cooldown info prominently
+    // Alerts: cooldown, rate limits
     let alertHtml='';
     if(p.cooldownRemainingMs){
       const mins=Math.ceil(p.cooldownRemainingMs/60000);
-      alertHtml=`<div style="background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--orange);margin-top:4px">\u23F1 Cooldown: ${mins}m remaining</div>`;
+      alertHtml+=`<div style="background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--orange);margin-top:4px">\u23F1 Cooldown: ${mins}m — unavailable</div>`;
+    } else if(p.cooldownExpired&&p.rateLimitCount>0){
+      alertHtml+=`<div style="font-size:11px;color:var(--green);margin-top:4px">\u2705 Cooldown cleared — ready</div>`;
     }
     if(p.rateLimitCount>0){
       alertHtml+=`<div style="font-size:11px;color:var(--orange);margin-top:2px">\u26A0 ${p.rateLimitCount} rate limit hits</div>`;
     }
+    // Role + plan label
+    const labelParts=[plan,role==='primary'?'Primary':role==='fallback'?'Fallback':''].filter(Boolean);
+    const label=labelParts.join(' \u00B7 ');
     return `<div class="glass provider-card status-${esc(st)}">
       <div class="provider-name">${info.icon} ${esc(info.name)}</div>
       <div style="display:flex;align-items:center;gap:6px;margin:2px 0">
         <span class="dot" style="background:${col};width:8px;height:8px"></span>
         <span style="color:${col};font-size:12px;font-weight:600">${esc(st.charAt(0).toUpperCase()+st.slice(1))}</span>
-        <span style="font-size:10px;color:var(--dim);margin-left:auto">${esc(plan)}</span>
+        ${label?`<span style="font-size:10px;color:var(--dim);margin-left:auto">${esc(label)}</span>`:''}
       </div>
       <div class="provider-stats">
         <span>Today: <strong style="color:var(--textStrong)">${todayCalls}</strong></span>
