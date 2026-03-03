@@ -671,6 +671,55 @@ except Exception as _e:
 # ── Activity feed ──
 activity_feed = []
 
+# Agent ID → display name
+AGENT_NAMES = {
+    'main': 'Holly', 'researcher': 'Archie', 'automator': 'Gears',
+    'scribe': 'Ink', 'coder': 'Forge', 'housekeeper': 'Tidy',
+    'steward': 'Steward', 'seo': 'Scout', 'ads': 'Adsmith',
+    'pm': 'Taskmaster', 'fpl': 'Gaffer',
+}
+
+# Brief descriptions for cron jobs (matched by substring in name)
+CRON_DESCRIPTIONS = {
+    'Morning briefing': 'Daily summary of overnight events and priorities',
+    'Weekly review': 'Review the week and plan ahead',
+    'Daily housekeeping': 'Clean workspace, prune logs, tidy configs',
+    'Weekly trend analysis': 'Analyse trends across systems and usage',
+    'Monthly reflection': 'Monthly retrospective and goal check',
+    'Weekly security audit': 'Scan for misconfigs, expired certs, permissions',
+    'YouTube feed sync': 'Sync YouTube subscriptions and new videos',
+    'Weekly software updater': 'Check for OS and package updates',
+    'Memory Consolidation': 'Compress and organise agent memory files',
+    'Workflow Health Check': 'Verify n8n workflows are active and healthy',
+    'Workflow Audit': 'Full audit of n8n workflow configs',
+    'Documentation Coverage': 'Find undocumented code and APIs',
+    'SEO Summary': 'Weekly SEO performance across all sites',
+    'Daily database sync': 'Sync all databases (FPL, GA4, Ads, etc.)',
+    'Hourly Sweep': 'Check tasks, update statuses, chase stale items',
+    'Email Triage': 'Triage inbox and create tasks from emails',
+    'Evening Review': 'End-of-day task review and tomorrow prep',
+    'Weekly Summary': 'Weekly task board summary and metrics',
+    'Ideas Backlog': 'Review and prioritise ideas backlog',
+    'Stale Ideas Purge': 'Archive stale ideas older than 90 days',
+    'Personal Tasks': 'Check Google Tasks for personal items',
+    'Hourly GitHub': 'Check repos for new issues, PRs, and alerts',
+    'CI Audit': 'Audit CI pipelines across all repos',
+    'Staleness Scan': 'Find stale docs that need updating',
+    'Runbook Testing': 'Verify runbooks are still accurate',
+    'PR Sweep': 'Review, fix, and merge open pull requests',
+    'Log Watch': 'Scan gateway logs for errors and anomalies',
+    'Ads + Woo Snapshot': 'Daily ads spend, GA4, and WooCommerce stats',
+    'MCP Smoke Test': 'Health check all MCP server containers',
+    'FPL Brief': 'Pre-deadline Fantasy Premier League briefing',
+}
+
+def get_cron_description(job_name):
+    """Match a cron job name to a brief description."""
+    for key, desc in CRON_DESCRIPTIONS.items():
+        if key.lower() in job_name.lower():
+            return desc
+    return ''
+
 # Cron job completions/failures (from cron jobs state)
 if os.path.exists(cron_path):
     try:
@@ -688,11 +737,17 @@ if os.path.exists(cron_path):
                         icon = '✅' if status == 'ok' else '❌' if status == 'error' else '⏰'
                         dur = state.get('lastDurationMs', 0)
                         dur_str = f" ({dur/1000:.0f}s)" if dur else ''
+                        agent_id = job.get('agentId', '')
+                        agent_name = AGENT_NAMES.get(agent_id, agent_id)
+                        job_name = job.get('name', '?')
+                        desc = get_cron_description(job_name)
                         activity_feed.append({
                             'time': run_dt.strftime('%H:%M'),
                             'timestamp': last_run_ms,
                             'icon': icon,
-                            'message': f'Cron: {job.get("name", "?")} {status}{dur_str}',
+                            'message': f'Cron: {job_name} {status}{dur_str}',
+                            'agent': agent_name,
+                            'description': desc,
                             'type': 'cron',
                         })
                 except Exception:

@@ -121,7 +121,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .feed-item:last-child{border-bottom:none}
 .feed-time{font-size:10px;color:var(--dim);white-space:nowrap;min-width:48px;flex-shrink:0;font-variant-numeric:tabular-nums}
 .feed-icon{font-size:14px;flex-shrink:0}
-.feed-msg{color:var(--muted);flex:1;word-break:break-word}
+.feed-body{flex:1;min-width:0}
+.feed-msg{color:var(--muted);word-break:break-word}
+.feed-desc{color:var(--dim);font-size:10px;margin-top:2px;word-break:break-word}
+.feed-agent{color:var(--accent,var(--textStrong));font-weight:600;font-size:10px;margin-right:4px}
 
 /* ── Error log ── */
 .error-section{margin-bottom:16px}
@@ -923,7 +926,9 @@ function renderFeed(){
   if(!recent.length){$('feedList').innerHTML='<div class="empty">No activity in last 12h</div>';return}
   $('feedList').innerHTML=recent.map(f=>{
     const t=f.time||'';
-    return `<div class="feed-item"><span class="feed-time">${esc(t)}</span><span class="feed-icon">${esc(f.icon||'\u2022')}</span><span class="feed-msg">${esc(f.message||'')}</span></div>`;
+    const agentHtml=f.agent?`<span class="feed-agent">${esc(f.agent)}</span>`:'';
+    const descHtml=f.description?`<div class="feed-desc">${esc(f.description)}</div>`:'';
+    return `<div class="feed-item"><span class="feed-time">${esc(t)}</span><span class="feed-icon">${esc(f.icon||'\u2022')}</span><div class="feed-body">${agentHtml}<span class="feed-msg">${esc(f.message||'')}</span>${descHtml}</div></div>`;
   }).join('');
 }
 
