@@ -181,12 +181,14 @@ PROVIDER_META = {
         'description': 'Kimi Code subscription (Moonshot AI)',
     },
     'openrouter': {
-        'providerType': 'credits',
-        'description': 'OpenRouter pay-as-you-go',
+        'providerType': 'api_key',
+        'plan': 'API Key',
+        'description': 'OpenRouter API (pay-per-use)',
     },
     'anthropic': {
-        'providerType': 'api_key',
-        'description': 'Anthropic API key',
+        'providerType': 'subscription',
+        'plan': 'API Subscription',
+        'description': 'Anthropic API subscription',
     },
 }
 
