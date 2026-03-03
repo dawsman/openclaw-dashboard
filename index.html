@@ -96,6 +96,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 .agent-dot{width:6px;height:6px;border-radius:50%;position:absolute;top:8px;right:8px}
 .agent-dot.active{background:var(--green);box-shadow:0 0 6px rgba(74,222,128,.5)}
 .agent-dot.idle{background:var(--dim)}
+.agent-card{cursor:pointer}
+.agent-tip{display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.4;color:var(--text);text-align:left;white-space:normal;width:180px;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:auto}
+.agent-tip::before{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:5px solid var(--border)}
+.agent-tip-name{font-weight:700;color:var(--textStrong);margin-bottom:2px}
+.agent-tip-desc{color:var(--muted);font-size:10px}
+.agent-card.tip-open .agent-tip{display:block}
+.agent-bar{display:none;padding:8px 12px;margin-top:4px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:11px;line-height:1.4;color:var(--text)}
+.agent-bar .agent-tip-name{font-weight:700;color:var(--textStrong);margin-right:6px}
+.agent-bar .agent-tip-desc{color:var(--muted);font-size:10px}
 
 /* ── MCP grid ── */
 .mcp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:16px}
@@ -302,6 +311,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
   .agent-grid::-webkit-scrollbar{height:3px}
   .agent-grid::-webkit-scrollbar-thumb{background:var(--scrollThumb);border-radius:3px}
   .agent-card{min-width:68px;flex-shrink:0}
+  .agent-tip{display:none!important}
+  .agent-bar{display:block}
   .mcp-grid{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch}
   .mcp-grid::-webkit-scrollbar{height:3px}
   .mcp-grid::-webkit-scrollbar-thumb{background:var(--scrollThumb);border-radius:3px}
@@ -380,6 +391,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans
 <!-- 4. Agent Cards (full-width row below providers) -->
 <div class="section-header"><span class="section-title">&#x1F916; Agents</span><span class="section-count" id="agentCount"></span></div>
 <div class="agent-grid" id="agentGrid"></div>
+<div class="agent-bar" id="agentBar"></div>
 
 <!-- 5. MCP Servers -->
 <div class="section-header"><span class="section-title">&#x1F50C; MCP Servers</span><span class="section-count" id="mcpCount"></span></div>
@@ -599,6 +611,23 @@ function relTime(ts){
 
 // ── Kanban consts ──
 const AGENT_EMOJI={holly:'\u26A1',forge:'\uD83D\uDD28',steward:'\uD83D\uDCE6',archie:'\uD83D\uDCDA',gears:'\u2699\uFE0F',ink:'\uD83D\uDD8A\uFE0F',scout:'\uD83D\uDD0E',gaffer:'\u26BD',adsmith:'\uD83D\uDCCA',taskmaster:'\uD83D\uDCCB'};
+const AGENT_NAME={router:'Router',main:'Holly',researcher:'Archie',automator:'Gears',scribe:'Ink',coder:'Forge',housekeeper:'Tidy',steward:'Steward',seo:'Scout',ads:'Adsmith',pm:'Taskmaster',fpl:'Gaffer',zen:'Zen',thelounge:'TheLounge'};
+const AGENT_DESC={
+  router:'Routes messages to the right agent based on intent.',
+  main:'Primary assistant — direct chats with the user.',
+  researcher:'Research tasks — deep dives, fact-checking, analysis.',
+  automator:'Automation — scripts, workflows, system tasks.',
+  scribe:'Writing and documentation — drafts, edits, docs.',
+  coder:'Code and development — PRs, reviews, CI fixes.',
+  housekeeper:'OpenClaw maintenance — cleanup, config tidying.',
+  steward:'System health — monitoring, updates, log watching.',
+  seo:'Technical SEO auditing and site health checks.',
+  ads:'Advertising — Google Ads, WooCommerce, GA4 reporting.',
+  pm:'Task management — triage, scheduling, follow-ups.',
+  fpl:'Fantasy Premier League — transfers, analysis, briefings.',
+  zen:'Mindfulness and wellbeing check-ins.',
+  thelounge:'IRC bridge — TheLounge integration.'
+};
 const AGENT_CLASS={holly:'a-holly',forge:'a-forge',steward:'a-steward',archie:'a-archie',gears:'a-gears',ink:'a-ink',scout:'a-scout'};
 const SOURCE_ICON={user:'\uD83D\uDC64',alert:'\uD83D\uDEA8',cron:'\u23F0',heartbeat:'\uD83D\uDC93',self:'\uD83E\uDD16'};
 const KANBAN_COLS=['backlog','queued','in_progress','review','done','failed','escalated'];
@@ -860,15 +889,35 @@ function renderAgents(){
     });
     const isActive=lastTs>0&&(now-lastTs)<1800000;
     const lastLabel=lastTs>0?relTime(lastTs):'--';
-    return `<div class="glass agent-card">
+    const desc=AGENT_DESC[a.id]||'';
+    const tipName=AGENT_NAME[a.id]||a.id;
+    return `<div class="glass agent-card" onclick="toggleAgentTip(this,event)">
       <div class="agent-dot ${isActive?'active':'idle'}"></div>
       <span class="agent-emoji">${emoji}</span>
       <div class="agent-id">${esc(a.id)}</div>
       <div class="agent-model">${esc(modelShort)}</div>
       <div class="agent-last">${isActive?'active':lastLabel}</div>
+      <div class="agent-tip"><div class="agent-tip-name">${esc(tipName)}</div><div class="agent-tip-desc">${esc(desc)}</div></div>
     </div>`;
   }).join('');
 }
+function toggleAgentTip(card,e){
+  e.stopPropagation();
+  const isMobile=window.innerWidth<768;
+  const wasOpen=card.classList.contains('tip-open');
+  document.querySelectorAll('.agent-card.tip-open').forEach(c=>c.classList.remove('tip-open'));
+  const bar=$('agentBar');
+  if(wasOpen){bar.style.display='none';return}
+  card.classList.add('tip-open');
+  if(isMobile){
+    const tip=card.querySelector('.agent-tip');
+    if(tip){bar.innerHTML=tip.innerHTML;bar.style.display='block'}
+  }
+}
+document.addEventListener('click',()=>{
+  document.querySelectorAll('.agent-card.tip-open').forEach(c=>c.classList.remove('tip-open'));
+  const bar=$('agentBar');if(bar)bar.style.display='none';
+});
 
 // ── MCP Servers ──
 const MCP_TYPE_LABEL={sse:'SSE',container:'Container',node:'Node',python:'Python',stdio:'Stdio',unknown:'—'};
