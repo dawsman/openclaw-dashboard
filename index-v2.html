@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw Dashboard</title>
+<style>
+/* ── Reset + Root ── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;
+  --surface:rgba(255,255,255,0.03);
+  --surfaceHover:rgba(255,255,255,0.045);
+  --border:rgba(255,255,255,0.06);
+  --accent:#6366f1;
+  --accent2:#9333ea;
+  --green:#4ade80;
+  --yellow:#facc15;
+  --red:#f87171;
+  --orange:#fb923c;
+  --purple:#a78bfa;
+  --text:#e5e5e5;
+  --textStrong:#ffffff;
+  --muted:#737373;
+  --dim:#525252;
+  --darker:#404040;
+  --tableBg:rgba(255,255,255,0.025);
+  --tableHover:rgba(255,255,255,0.05);
+  --scrollThumb:rgba(255,255,255,0.1)
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;padding:16px 20px;overflow-x:hidden
+}
+
+/* ── Dashboard container ── */
+.dashboard{max-width:1440px;margin:0 auto}
+
+/* ── Header ── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding-bottom:12px;border-bottom:1px solid var(--border)
+}
+.header-left{display:flex;align-items:center;gap:10px}
+.avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0
+}
+.header-info{}
+.header-title{font-size:18px;font-weight:700;color:var(--textStrong)}
+.header-status{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:1px}
+.hdr-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.hdr-dot.on{background:var(--green);box-shadow:0 0 8px rgba(74,222,128,.5);animation:pulse 2s ease-in-out infinite}
+.hdr-dot.off{background:var(--red);box-shadow:0 0 8px rgba(248,113,113,.5)}
+.header-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);margin-top:1px;flex-wrap:wrap}
+.header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.header-spend{font-size:13px;font-weight:600;color:var(--textStrong);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ── Refresh + Countdown ── */
+.refresh-btn{
+  background:var(--surface);border:1px solid var(--border);padding:6px 14px;border-radius:8px;
+  color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s
+}
+.refresh-btn:hover{background:var(--surfaceHover);color:var(--textStrong)}
+.countdown{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;min-width:24px}
+.last-update{font-size:11px;color:var(--dim)}
+
+/* ── Theme picker ── */
+.theme-picker{position:relative;display:inline-block}
+.theme-btn{
+  background:var(--surface);border:1px solid var(--border);padding:6px 10px;border-radius:8px;
+  color:var(--muted);font-size:14px;cursor:pointer;transition:all .15s;line-height:1
+}
+.theme-btn:hover{background:var(--surfaceHover);color:var(--textStrong)}
+.theme-menu{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  padding:6px;min-width:200px;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.3)
+}
+.theme-menu.open{display:block}
+.theme-menu-label{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);padding:6px 10px 4px}
+.theme-opt{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;
+  font-size:13px;color:var(--text);transition:background .1s;border:none;background:none;width:100%;text-align:left
+}
+.theme-opt:hover{background:var(--surfaceHover)}
+.theme-opt.active{background:var(--surface);color:var(--textStrong);font-weight:600}
+.theme-opt-icon{font-size:16px;width:22px;text-align:center}
+.theme-opt-swatch{width:14px;height:14px;border-radius:4px;border:1px solid var(--border);flex-shrink:0}
+
+/* ── Actions dropdown ── */
+.actions-toggle{position:relative;display:inline-block}
+.actions-btn{
+  background:var(--surface);border:1px solid var(--border);padding:6px 10px;border-radius:8px;
+  color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s;line-height:1
+}
+.actions-btn:hover{background:var(--surfaceHover);color:var(--textStrong)}
+.actions-menu{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  padding:12px;min-width:320px;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.3)
+}
+.actions-menu.open{display:block}
+.actions-menu-title{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.actions-group{display:flex;flex-direction:column;gap:8px}
+.action-btn{
+  padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);transition:all .15s;
+  display:flex;align-items:center;gap:6px;width:100%
+}
+.action-btn:hover{background:var(--surfaceHover);color:var(--textStrong)}
+.action-btn:disabled{opacity:.5;cursor:not-allowed}
+.action-btn.danger{border-color:rgba(248,113,113,.3);color:var(--red)}
+.action-btn.danger:hover{background:rgba(248,113,113,.08)}
+.action-row{display:flex;gap:0;align-items:stretch}
+.action-row select{
+  flex:1;padding:8px 10px;border-radius:8px 0 0 8px;font-size:11px;
+  border:1px solid var(--border);border-right:none;background:var(--bg);color:var(--text);
+  cursor:pointer;font-family:inherit;min-width:0
+}
+.action-row .action-btn{border-radius:0 8px 8px 0;width:auto;flex-shrink:0}
+.action-result{font-size:11px;color:var(--green);padding:4px 0;min-height:20px}
+.action-result.err{color:var(--red)}
+
+/* ── Pulse animation ── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Status row ── */
+.status-row{
+  display:flex;gap:0;padding:12px 0;justify-content:center
+}
+.status-indicator{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:8px 24px;cursor:pointer;border-radius:8px;transition:background .15s;position:relative
+}
+.status-indicator:hover{background:var(--surface)}
+.status-dot{width:12px;height:12px;border-radius:50%;transition:background .3s}
+.status-dot.green{background:var(--green);box-shadow:0 0 8px rgba(74,222,128,.4)}
+.status-dot.yellow{background:var(--yellow);box-shadow:0 0 8px rgba(250,204,21,.4);animation:pulse 2s ease-in-out infinite}
+.status-dot.red{background:var(--red);box-shadow:0 0 8px rgba(248,113,113,.4);animation:pulse 2s ease-in-out infinite}
+.status-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.status-detail{
+  display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:6px 10px;font-size:11px;white-space:nowrap;z-index:10;color:var(--text);
+  box-shadow:0 4px 12px rgba(0,0,0,.4)
+}
+.status-indicator:hover .status-detail{display:block}
+
+/* ── Two-column main grid ── */
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px}
+.main-left{}
+.main-right{}
+
+/* ── Section labels ── */
+.section-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.section-meta{font-weight:400;color:var(--dim)}
+
+/* ── Provider grid ── */
+.provider-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:20px}
+.prov-card{
+  padding:10px 12px;border-radius:10px;background:var(--surface);
+  border:1px solid var(--border);border-left:3px solid var(--dim);transition:background .15s
+}
+.prov-card:hover{background:var(--surfaceHover)}
+.prov-card.s-ok{border-left-color:var(--green)}
+.prov-card.s-degraded{border-left-color:var(--yellow)}
+.prov-card.s-down{border-left-color:var(--red)}
+.prov-card.s-cooldown{border-left-color:var(--orange)}
+.prov-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.prov-name{font-size:12px;font-weight:600;color:var(--textStrong)}
+.prov-status{font-size:10px;font-weight:600;display:flex;align-items:center;gap:4px}
+.prov-calls{font-size:11px;color:var(--muted)}
+.prov-quota{margin-top:6px}
+.prov-quota-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.prov-quota-fill{height:100%;border-radius:2px;transition:width .3s}
+.prov-quota-label{font-size:9px;color:var(--dim);margin-top:2px;display:flex;justify-content:space-between}
+.prov-alert{font-size:10px;color:var(--orange);margin-top:4px}
+
+/* ── Agent grid ── */
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:4px;margin-bottom:16px}
+.agent-card{
+  text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;
+  position:relative;transition:background .15s
+}
+.agent-card:hover{background:var(--surface)}
+.agent-emoji{font-size:18px;display:block;margin-bottom:2px}
+.agent-id{font-size:9px;font-weight:700;color:var(--textStrong)}
+.agent-model{font-size:7px;color:var(--dim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-last{font-size:7px;color:var(--muted);margin-top:1px}
+.agent-dot{width:6px;height:6px;border-radius:50%;position:absolute;top:6px;right:6px}
+.agent-dot.active{background:var(--green);box-shadow:0 0 6px rgba(74,222,128,.5)}
+.agent-dot.idle{background:var(--dim)}
+.agent-tip{
+  display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 6px);
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:11px;line-height:1.4;color:var(--text);text-align:left;
+  white-space:normal;width:170px;z-index:20;box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:auto
+}
+.agent-tip::before{
+  content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);
+  border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:5px solid var(--border)
+}
+.agent-tip-name{font-weight:700;color:var(--textStrong);margin-bottom:2px}
+.agent-tip-desc{color:var(--muted);font-size:10px}
+.agent-card.tip-open .agent-tip{display:block}
+.agent-bar{
+  display:none;padding:8px 12px;margin-bottom:8px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  font-size:11px;line-height:1.4;color:var(--text)
+}
+.agent-bar .agent-tip-name{font-weight:700;color:var(--textStrong);margin-right:6px}
+.agent-bar .agent-tip-desc{color:var(--muted);font-size:10px}
+
+/* ── Feed panel ── */
+.feed-panel{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:20px;overflow:hidden
+}
+.feed-list{max-height:280px;overflow-y:auto}
+.feed-item{display:flex;align-items:flex-start;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px}
+.feed-item:last-child{border-bottom:none}
+.feed-time{font-size:10px;color:var(--dim);white-space:nowrap;min-width:44px;font-variant-numeric:tabular-nums;flex-shrink:0}
+.feed-icon{font-size:13px;flex-shrink:0}
+.feed-body{flex:1;min-width:0}
+.feed-agent{color:var(--accent);font-weight:600;font-size:10px;margin-right:4px}
+.feed-msg{color:var(--muted);word-break:break-word}
+.feed-desc{color:var(--dim);font-size:10px;margin-top:1px;word-break:break-word}
+
+/* ── Cost panel ── */
+.cost-panel{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px
+}
+.cost-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+.cost-label{color:var(--muted)}
+.cost-value{color:var(--textStrong);font-weight:600;font-variant-numeric:tabular-nums}
+.cost-value.projected{color:var(--dim);font-weight:400}
+.cost-divider{border-top:1px solid var(--border);margin:6px 0}
+.cost-expand-btn{
+  background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;
+  padding:4px 0;width:100%;text-align:left
+}
+.cost-expand-btn:hover{color:var(--textStrong)}
+.cost-breakdown{display:none}
+.cost-breakdown.open{display:block}
+.cost-breakdown-row{display:flex;justify-content:space-between;padding:3px 0;font-size:11px}
+.cost-breakdown-model{color:var(--muted)}
+.cost-breakdown-value{color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* ── Alerts ── */
+.alerts-section{margin-bottom:0}
+.alerts-section:empty{display:none}
+.alert-item{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;margin-bottom:6px
+}
+.alert-critical{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2)}
+.alert-high{background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.15)}
+.alert-medium{background:rgba(250,204,21,.06);border:1px solid rgba(250,204,21,.1)}
+.alert-low{background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.1)}
+.alert-icon{font-size:16px}
+.alert-msg{font-size:12px;color:var(--text);flex:1}
+.alert-dismiss{
+  background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px;padding:2px 6px;
+  border-radius:4px;flex-shrink:0
+}
+.alert-dismiss:hover{color:var(--textStrong);background:var(--surfaceHover)}
+
+/* ── Kanban board ── */
+.kanban-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;margin-bottom:24px}
+.kanban-col{min-width:200px;max-width:240px;flex:1}
+.kanban-col-header{
+  font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);padding:8px 10px;display:flex;justify-content:space-between;align-items:center
+}
+.kanban-col-count{background:var(--surface);padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;color:var(--muted)}
+.kanban-col-body{display:flex;flex-direction:column;gap:6px;min-height:60px}
+.kanban-card{
+  padding:10px 12px;border-radius:8px;background:var(--surface);
+  border:1px solid var(--border);border-left:3px solid var(--card-accent,var(--accent));
+  cursor:pointer;transition:background .15s
+}
+.kanban-card:hover{background:var(--surfaceHover)}
+.kanban-card-title{
+  font-size:12px;font-weight:600;color:var(--textStrong);margin-bottom:6px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.kanban-card-meta{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.kanban-card-agent{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600;white-space:nowrap}
+.kanban-card-agent.a-holly{background:rgba(245,158,11,.12);color:#f59e0b}
+.kanban-card-agent.a-forge{background:rgba(59,130,246,.12);color:#3b82f6}
+.kanban-card-agent.a-steward{background:rgba(34,197,94,.12);color:#22c55e}
+.kanban-card-agent.a-archie{background:rgba(168,85,247,.12);color:#a855f7}
+.kanban-card-agent.a-gears{background:rgba(249,115,22,.12);color:#f97316}
+.kanban-card-agent.a-ink{background:rgba(20,184,166,.12);color:#14b8a6}
+.kanban-card-agent.a-scout{background:rgba(239,68,68,.12);color:#ef4444}
+.kanban-card-agent.a-other{background:var(--tableBg);color:var(--dim)}
+.kanban-card-priority{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.kanban-card-priority.p-critical{background:#ef4444}
+.kanban-card-priority.p-high{background:#f97316}
+.kanban-card-priority.p-normal{background:#facc15}
+.kanban-card-priority.p-low{background:#737373}
+.kanban-card-time{font-size:10px;color:var(--dim);margin-left:auto}
+.kanban-card-source{font-size:10px}
+.kanban-card-attempts{font-size:9px;color:var(--red);font-weight:600}
+.kanban-card-subtasks{width:100%;height:4px;background:var(--tableBg);border-radius:2px;margin-top:6px;overflow:hidden}
+.kanban-card-subtasks-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s}
+.kanban-stats{display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.kanban-stats span{display:flex;align-items:center;gap:4px}
+.kanban-stats .ks-val{color:var(--textStrong);font-weight:600}
+.kanban-modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;
+  align-items:center;justify-content:center
+}
+.kanban-modal-overlay.open{display:flex}
+.kanban-modal{
+  background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;
+  max-width:560px;width:90vw;max-height:80vh;overflow-y:auto
+}
+.kanban-modal-title{font-size:16px;font-weight:700;color:var(--textStrong);margin-bottom:12px}
+.kanban-modal-field{margin-bottom:10px}
+.kanban-modal-label{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+.kanban-modal-value{font-size:12px;color:var(--text);white-space:pre-wrap}
+.kanban-modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+
+/* ── Cron table ── */
+.cron-container{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  overflow-x:auto;margin-bottom:24px
+}
+.cron-table{width:100%;border-collapse:collapse}
+.cron-table th{
+  padding:8px 10px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--dim);font-weight:600;text-align:left;border-bottom:1px solid var(--border)
+}
+.cron-table th.r{text-align:right}
+.cron-table td{padding:8px 10px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)}
+.cron-table td.r{text-align:right}
+.cron-table td.w{color:var(--textStrong);font-weight:500}
+.cron-table tr:last-child td{border-bottom:none}
+.cron-table tr:hover{background:var(--surfaceHover)}
+
+/* ── Mobile cron cards ── */
+.cron-cards{display:none}
+
+/* ── Status dot inline ── */
+.sd{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.sd-ok{background:var(--green)}
+.sd-error{background:var(--red)}
+.sd-none{background:var(--dim)}
+.sd-pending{background:var(--yellow)}
+
+/* ── Details accordion ── */
+.details-section{margin-top:8px;margin-bottom:24px}
+.details-tabs{display:flex;gap:4px;margin-bottom:0;border-bottom:1px solid var(--border);padding-bottom:0}
+.details-tab{
+  padding:8px 16px;font-size:11px;font-weight:600;color:var(--dim);
+  background:none;border:none;border-bottom:2px solid transparent;
+  cursor:pointer;transition:all .15s;margin-bottom:-1px
+}
+.details-tab:hover{color:var(--muted)}
+.details-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.details-panel{
+  background:var(--surface);border:1px solid var(--border);border-top:none;
+  border-radius:0 0 10px 10px;padding:16px
+}
+
+/* ── Tab buttons ── */
+.tab-group{display:flex;gap:4px}
+.tab-btn{
+  padding:4px 12px;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--dim);transition:all .15s
+}
+.tab-btn.active{background:rgba(99,102,241,.15);color:var(--accent);border-color:rgba(99,102,241,.3)}
+.tab-btn.active-purple{background:rgba(168,85,247,.15);color:var(--purple);border-color:rgba(168,85,247,.3)}
+
+/* ── Badges ── */
+.badge{font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:4px;white-space:nowrap}
+.badge-ok{background:rgba(74,222,128,.12);color:var(--green)}
+.badge-err{background:rgba(248,113,113,.12);color:var(--red)}
+.badge-active{background:rgba(74,222,128,.12);color:var(--green)}
+.badge-available{background:rgba(99,102,241,.12);color:var(--accent)}
+.badge-none{background:var(--tableBg);color:var(--dim)}
+
+/* ── Skills tags ── */
+.skill-tag{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:500;border:1px solid;display:inline-block}
+
+/* ── Git log items ── */
+.git-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.git-item:last-child{border-bottom:none}
+.git-hash{font-family:'SF Mono',Monaco,monospace;font-size:12px;color:var(--purple);font-weight:500;flex-shrink:0}
+.git-msg{font-size:12px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.git-ago{font-size:10px;color:var(--dim);white-space:nowrap;flex-shrink:0}
+
+/* ── Chart ── */
+.chart-container{padding:16px}
+.chart-title{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chart-legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}
+.chart-legend-dot{width:8px;height:8px;border-radius:2px}
+
+/* ── Tooltip utility ── */
+[data-tip]{position:relative;cursor:help}
+[data-tip]:hover::after{
+  content:attr(data-tip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);
+  background:var(--bg);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px;
+  white-space:pre-wrap;max-width:300px;z-index:10;border:1px solid var(--border);pointer-events:none
+}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:20px;color:var(--dim);font-size:12px}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--scrollThumb);border-radius:2px}
+
+/* ── AI Chat ── */
+.chat-fab{
+  position:fixed;bottom:24px;right:24px;width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  box-shadow:0 4px 20px rgba(99,102,241,.4);z-index:1000;transition:transform .2s
+}
+.chat-fab:hover{transform:scale(1.1)}
+.chat-panel{
+  position:fixed;bottom:84px;right:24px;width:360px;max-height:520px;
+  display:none;flex-direction:column;border-radius:16px;border:1px solid var(--border);
+  background:var(--bg);box-shadow:0 8px 40px rgba(0,0,0,.5);z-index:999;overflow:hidden
+}
+.chat-panel.open{display:flex}
+.chat-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface)
+}
+.chat-header-title{font-size:13px;font-weight:700;color:var(--textStrong)}
+.chat-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px}
+.chat-close:hover{color:var(--textStrong);background:var(--surfaceHover)}
+.chat-messages{
+  flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;
+  min-height:200px;max-height:340px
+}
+.chat-bubble{padding:8px 12px;border-radius:10px;font-size:12px;line-height:1.5;max-width:90%;word-wrap:break-word;white-space:pre-wrap}
+.chat-bubble.user{
+  background:rgba(99,102,241,.15);color:var(--text);border:1px solid rgba(99,102,241,.2);
+  align-self:flex-end;border-radius:10px 10px 2px 10px
+}
+.chat-bubble.assistant{
+  background:var(--surface);color:var(--text);border:1px solid var(--border);
+  align-self:flex-start;border-radius:10px 10px 10px 2px
+}
+.chat-bubble.error{background:rgba(248,113,113,.08);color:var(--red);border:1px solid rgba(248,113,113,.2);align-self:flex-start}
+.chat-bubble.thinking{color:var(--dim);font-style:italic;align-self:flex-start}
+.chat-quick{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px;border-top:1px solid var(--border)}
+.chat-chip{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:4px 10px;font-size:10px;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap
+}
+.chat-chip:hover{background:var(--surfaceHover);color:var(--textStrong);border-color:var(--accent)}
+.chat-input-row{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface)}
+.chat-input{
+  flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:7px 10px;font-size:12px;color:var(--text);font-family:inherit;resize:none;outline:none;transition:border-color .15s
+}
+.chat-input:focus{border-color:var(--accent)}
+.chat-send{
+  background:var(--accent);border:none;border-radius:8px;padding:7px 12px;
+  color:#fff;font-size:13px;cursor:pointer;transition:background .15s;flex-shrink:0
+}
+.chat-send:hover{background:var(--accent2)}
+.chat-send:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Responsive ── */
+@media(max-width:1023px){
+  .main-grid{grid-template-columns:1fr}
+}
+@media(max-width:767px){
+  body{padding:10px}
+  .header{flex-direction:column;align-items:flex-start;gap:8px}
+  .header-right{width:100%;justify-content:space-between;flex-wrap:wrap}
+  .status-row{flex-wrap:wrap;gap:4px}
+  .status-indicator{padding:6px 12px}
+  .provider-grid{grid-template-columns:1fr 1fr}
+  .agent-grid{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+  .agent-grid::-webkit-scrollbar{height:3px}
+  .agent-grid::-webkit-scrollbar-thumb{background:var(--scrollThumb);border-radius:3px}
+  .agent-card{min-width:64px;flex-shrink:0}
+  .agent-tip{display:none!important}
+  .agent-bar{display:block}
+  .kanban-board{overflow-x:auto}
+  .chat-panel{width:calc(100vw - 24px);right:12px;bottom:76px}
+  .details-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .actions-menu{right:auto;left:0;min-width:calc(100vw - 40px)}
+  .cron-container{display:none}
+  .cron-cards{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+  .cron-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:10px 12px;border-left:3px solid var(--dim)
+  }
+  .cron-card.cron-ok{border-left-color:var(--green)}
+  .cron-card.cron-error{border-left-color:var(--red)}
+  .cron-card-name{font-size:12px;font-weight:600;color:var(--textStrong);margin-bottom:4px}
+  .cron-card-meta{font-size:10px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px}
+}
+@media(max-width:480px){
+  .provider-grid{grid-template-columns:1fr}
+  .status-indicator{padding:4px 8px}
+  .status-label{font-size:9px}
+}
+@media(min-width:768px){
+  .provider-grid{grid-template-columns:repeat(5,1fr)}
+  .agent-grid{grid-template-columns:repeat(13,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="dashboard">
+
+<!-- ═══ LAYER 1: Header ═══ -->
+<div class="header">
+  <div class="header-left">
+    <div class="avatar" id="botEmoji">&#x26A1;</div>
+    <div class="header-info">
+      <div class="header-title" id="botName">OpenClaw Dashboard</div>
+      <div class="header-status">
+        <span class="hdr-dot on" id="statusDot"></span>
+        <span style="color:var(--green);font-weight:500" id="statusText">Online</span>
+      </div>
+      <div class="header-meta">
+        <span id="hUptime">--</span>
+        <span>|</span>
+        <span id="hSessions">0 sessions</span>
+        <span>|</span>
+        <span id="hMemory">--</span>
+      </div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="header-spend" id="headerSpend"></span>
+    <div class="actions-toggle">
+      <button class="actions-btn" onclick="toggleActionsMenu()" title="Actions">&#x2699;&#xFE0F;</button>
+      <div class="actions-menu" id="actionsMenu">
+        <div class="actions-menu-title">Actions</div>
+        <div class="actions-group">
+          <button class="action-btn danger" id="restartGwBtn" onclick="restartGateway()">&#x1F504; Restart Gateway</button>
+          <div class="action-row">
+            <select id="containerSelect"><option value="">Container...</option></select>
+            <button class="action-btn" onclick="restartContainer()">Restart</button>
+          </div>
+          <div class="action-row">
+            <select id="cronSelect"><option value="">Cron job...</option></select>
+            <button class="action-btn" onclick="runCron()">Run</button>
+          </div>
+          <div class="action-result" id="actionResult"></div>
+        </div>
+      </div>
+    </div>
+    <div class="theme-picker">
+      <button class="theme-btn" id="themeBtn" onclick="toggleThemeMenu()" title="Change theme">&#x1F3A8;</button>
+      <div class="theme-menu" id="themeMenu"></div>
+    </div>
+    <button class="refresh-btn" onclick="loadData()">&#x21BB; Refresh</button>
+    <span class="countdown" id="countdown">60s</span>
+    <span class="last-update" id="lastUpdate"></span>
+  </div>
+</div>
+
+<!-- ═══ LAYER 1: Status Row ═══ -->
+<div class="status-row" id="statusRow"></div>
+
+<!-- ═══ LAYER 2: Two-Column Grid ═══ -->
+<div class="main-grid">
+  <div class="main-left">
+    <div id="providersSection">
+      <div class="section-label">Providers</div>
+      <div class="provider-grid" id="providerGrid"></div>
+    </div>
+    <div id="agentsSection">
+      <div class="section-label">Agents <span class="section-meta" id="agentCount"></span></div>
+      <div class="agent-grid" id="agentGrid"></div>
+      <div class="agent-bar" id="agentBar"></div>
+    </div>
+  </div>
+  <div class="main-right">
+    <div>
+      <div class="section-label">Activity <span class="section-meta" id="feedCount"></span></div>
+      <div class="feed-panel">
+        <div class="feed-list" id="feedList">
+          <div class="empty">No activity</div>
+        </div>
+      </div>
+    </div>
+    <div id="costSection">
+      <div class="section-label">Cost</div>
+      <div class="cost-panel" id="costPanel"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LAYER 3: Alerts ═══ -->
+<div class="alerts-section" id="alertsSection"></div>
+
+<!-- ═══ LAYER 3: Kanban ═══ -->
+<div id="kanbanSection" style="margin-top:24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <div class="section-label" style="margin-bottom:0">Task Board</div>
+    <div class="kanban-stats" id="kanbanStats"></div>
+  </div>
+  <div class="kanban-board" id="kanbanBoard">
+    <div class="kanban-col" id="kColBacklog"><div class="kanban-col-header">Backlog <span class="kanban-col-count" id="kCntBacklog">0</span></div><div class="kanban-col-body" id="kBodyBacklog"></div></div>
+    <div class="kanban-col" id="kColQueued"><div class="kanban-col-header">Queued <span class="kanban-col-count" id="kCntQueued">0</span></div><div class="kanban-col-body" id="kBodyQueued"></div></div>
+    <div class="kanban-col" id="kColInProgress"><div class="kanban-col-header">In Progress <span class="kanban-col-count" id="kCntInProgress">0</span></div><div class="kanban-col-body" id="kBodyInProgress"></div></div>
+    <div class="kanban-col" id="kColReview"><div class="kanban-col-header">Review <span class="kanban-col-count" id="kCntReview">0</span></div><div class="kanban-col-body" id="kBodyReview"></div></div>
+    <div class="kanban-col" id="kColDone"><div class="kanban-col-header">Done <span class="kanban-col-count" id="kCntDone">0</span></div><div class="kanban-col-body" id="kBodyDone"></div></div>
+    <div class="kanban-col" id="kColFailed"><div class="kanban-col-header">Failed <span class="kanban-col-count" id="kCntFailed">0</span></div><div class="kanban-col-body" id="kBodyFailed"></div></div>
+    <div class="kanban-col" id="kColEscalated"><div class="kanban-col-header">Escalated <span class="kanban-col-count" id="kCntEscalated">0</span></div><div class="kanban-col-body" id="kBodyEscalated"></div></div>
+  </div>
+</div>
+
+<!-- Kanban modal -->
+<div class="kanban-modal-overlay" id="kanbanModal" onclick="if(event.target===this)closeKanbanModal()">
+  <div class="kanban-modal" style="position:relative">
+    <button class="kanban-modal-close" onclick="closeKanbanModal()">&#x2715;</button>
+    <div id="kanbanModalContent"></div>
+  </div>
+</div>
+
+<!-- ═══ LAYER 3: Crons ═══ -->
+<div id="cronsSection">
+  <div class="section-label">Cron Jobs <span class="section-meta" id="cronCount"></span></div>
+  <div class="cron-container">
+    <table class="cron-table" id="cronTable">
+      <thead><tr><th>Status</th><th>Name</th><th>Schedule</th><th>Last Run</th><th>Next Run</th><th class="r">Duration</th><th>Model</th></tr></thead>
+      <tbody id="cronBody"></tbody>
+    </table>
+  </div>
+  <div class="cron-cards" id="cronCards"></div>
+</div>
+
+<!-- ═══ LAYER 4: Details Accordion ═══ -->
+<div class="details-section">
+  <div class="details-tabs">
+    <button class="details-tab" data-panel="detSubagent" onclick="openDetailTab('detSubagent')">Sub-Agent Runs</button>
+    <button class="details-tab" data-panel="detSkills" onclick="openDetailTab('detSkills')">Skills</button>
+    <button class="details-tab" data-panel="detGit" onclick="openDetailTab('detGit')">Git Log</button>
+    <button class="details-tab" data-panel="detChart" onclick="openDetailTab('detChart')">API Chart</button>
+  </div>
+  <div class="details-panel" id="detSubagent" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="tab-group">
+        <button class="tab-btn active-purple" id="srTabT" onclick="srTab='today';render()">Today</button>
+        <button class="tab-btn" id="srTab7" onclick="srTab='7d';render()">7 Days</button>
+        <button class="tab-btn" id="srTab30" onclick="srTab='30d';render()">30 Days</button>
+        <button class="tab-btn" id="srTabA" onclick="srTab='all';render()">All Time</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="cron-table">
+        <thead><tr><th>Task</th><th>Model</th><th class="r">Duration</th><th>Status</th><th>Time</th></tr></thead>
+        <tbody id="srBody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="srEmpty" style="display:none">No sub-agent runs</div>
+  </div>
+  <div class="details-panel" id="detSkills" style="display:none">
+    <div style="display:flex;flex-wrap:wrap;gap:5px" id="skillsGrid"></div>
+  </div>
+  <div class="details-panel" id="detGit" style="display:none">
+    <div id="gitPanel"></div>
+  </div>
+  <div class="details-panel" id="detChart" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="tab-group">
+        <button class="tab-btn active" id="cTab7" onclick="chartDays=7;renderCharts()">7 Days</button>
+        <button class="tab-btn" id="cTab30" onclick="chartDays=30;renderCharts()">30 Days</button>
+      </div>
+    </div>
+    <div class="chart-container" id="callChart"></div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;padding:12px;font-size:10px;color:var(--darker)">OpenClaw Dashboard v2</div>
+
+</div><!-- /.dashboard -->
+
+<script>
+// ══════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+function safeColor(v){return /^#[0-9a-fA-F]{3,8}$/.test(v||'')?v:'#888888'}
+function relTime(ts){
+  if(!ts)return'\u2014';
+  let d;
+  if(typeof ts==='number')d=new Date(ts);
+  else{d=new Date(ts);if(isNaN(d))return ts}
+  const diff=Math.floor((Date.now()-d)/1000);
+  if(diff<60)return diff+'s ago';
+  if(diff<3600)return Math.floor(diff/60)+'m ago';
+  if(diff<86400)return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
+
+// ══════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════
+const AGENT_EMOJI={holly:'\u26A1',forge:'\uD83D\uDD28',steward:'\uD83D\uDCE6',archie:'\uD83D\uDCDA',gears:'\u2699\uFE0F',ink:'\uD83D\uDD8A\uFE0F',scout:'\uD83D\uDD0E',gaffer:'\u26BD',adsmith:'\uD83D\uDCCA',taskmaster:'\uD83D\uDCCB'};
+const AGENT_NAME={router:'Router',main:'Holly',researcher:'Archie',automator:'Gears',scribe:'Ink',coder:'Forge',housekeeper:'Tidy',steward:'Steward',seo:'Scout',ads:'Adsmith',pm:'Taskmaster',fpl:'Gaffer',zen:'Zen',thelounge:'TheLounge'};
+const AGENT_DESC={
+  router:'Routes messages to the right agent based on intent.',
+  main:'Primary assistant \u2014 direct chats with the user.',
+  researcher:'Research tasks \u2014 deep dives, fact-checking, analysis.',
+  automator:'Automation \u2014 scripts, workflows, system tasks.',
+  scribe:'Writing and documentation \u2014 drafts, edits, docs.',
+  coder:'Code and development \u2014 PRs, reviews, CI fixes.',
+  housekeeper:'OpenClaw maintenance \u2014 cleanup, config tidying.',
+  steward:'System health \u2014 monitoring, updates, log watching.',
+  seo:'Technical SEO auditing and site health checks.',
+  ads:'Advertising \u2014 Google Ads, WooCommerce, GA4 reporting.',
+  pm:'Task management \u2014 triage, scheduling, follow-ups.',
+  fpl:'Fantasy Premier League \u2014 transfers, analysis, briefings.',
+  zen:'Mindfulness and wellbeing check-ins.',
+  thelounge:'IRC bridge \u2014 TheLounge integration.'
+};
+const AGENT_CLASS={holly:'a-holly',forge:'a-forge',steward:'a-steward',archie:'a-archie',gears:'a-gears',ink:'a-ink',scout:'a-scout'};
+const SOURCE_ICON={user:'\uD83D\uDC64',alert:'\uD83D\uDEA8',cron:'\u23F0',heartbeat:'\uD83D\uDC93',self:'\uD83E\uDD16'};
+const KANBAN_COLS=['backlog','queued','in_progress','review','done','failed','escalated'];
+const PROVIDER_MAP={
+  'openai-codex':{icon:'\uD83E\uDD16',name:'OpenAI'},
+  'github-copilot':{icon:'\uD83D\uDC19',name:'Copilot'},
+  'kimi-coding':{icon:'\uD83C\uDF19',name:'Kimi'},
+  'anthropic':{icon:'\uD83D\uDD2E',name:'Anthropic'},
+  'openrouter':{icon:'\uD83D\uDD00',name:'OpenRouter'}
+};
+const AGENT_ICON_MAP={
+  main:'\u26A1',coder:'\uD83D\uDD28',steward:'\uD83D\uDCE6',researcher:'\uD83D\uDCDA',
+  automator:'\u2699\uFE0F',scribe:'\uD83D\uDD8A\uFE0F',seo:'\uD83D\uDD0E',ads:'\uD83D\uDCCA',
+  pm:'\uD83D\uDCCB',fpl:'\u26BD',housekeeper:'\uD83E\uDDF9',router:'\uD83D\uDD00',thelounge:'\uD83D\uDCAC'
+};
+const STATUS_COLOR={ok:'var(--green)',degraded:'var(--yellow)',down:'var(--red)',cooldown:'var(--orange)'};
+const MCP_TYPE_LABEL={sse:'SSE',container:'Container',node:'Node',python:'Python',stdio:'Stdio',unknown:'\u2014'};
+const COLORS=['#6366f1','#9333ea','#ec4899','#f59e0b','#10b981','#06b6d4','#f87171','#84cc16'];
+
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+let D={},timer=60,srTab='today',chartDays=7,kanbanData=null;
+let chatHistory=[],CHAT_MAX_HISTORY=6;
+let THEMES={},currentTheme='midnight';
+const dismissedAlerts=new Set();
+
+// ══════════════════════════════════════════════════════
+// THEME ENGINE
+// ══════════════════════════════════════════════════════
+async function loadThemes(){
+  try{
+    const r=await fetch('/themes.json?t='+Date.now());
+    THEMES=await r.json();
+  }catch(e){console.warn('themes.json not found, using defaults');return}
+  const saved=localStorage.getItem('ocDashTheme');
+  if(saved&&THEMES[saved])currentTheme=saved;
+  applyTheme(currentTheme);
+  renderThemeMenu();
+}
+
+function applyTheme(id){
+  const t=THEMES[id];if(!t)return;
+  currentTheme=id;
+  const root=document.documentElement;
+  const c=t.colors;
+  root.style.setProperty('--bg',c.bg);
+  root.style.setProperty('--surface',c.surface);
+  root.style.setProperty('--surfaceHover',c.surfaceHover);
+  root.style.setProperty('--border',c.border);
+  root.style.setProperty('--accent',c.accent);
+  root.style.setProperty('--accent2',c.accent2);
+  root.style.setProperty('--green',c.green);
+  root.style.setProperty('--yellow',c.yellow);
+  root.style.setProperty('--red',c.red);
+  root.style.setProperty('--orange',c.orange);
+  root.style.setProperty('--purple',c.purple);
+  root.style.setProperty('--text',c.text);
+  root.style.setProperty('--textStrong',c.textStrong);
+  root.style.setProperty('--muted',c.muted);
+  root.style.setProperty('--dim',c.dim);
+  root.style.setProperty('--darker',c.darker);
+  root.style.setProperty('--tableBg',c.tableBg);
+  root.style.setProperty('--tableHover',c.tableHover);
+  root.style.setProperty('--scrollThumb',c.scrollThumb);
+  localStorage.setItem('ocDashTheme',id);
+  renderThemeMenu();
+}
+
+function renderThemeMenu(){
+  const menu=$('themeMenu');if(!menu)return;
+  const darkThemes=Object.entries(THEMES).filter(([,t])=>t.type==='dark');
+  const lightThemes=Object.entries(THEMES).filter(([,t])=>t.type==='light');
+  let html='<div class="theme-menu-label">Dark Themes</div>';
+  darkThemes.forEach(([id,t])=>{
+    const accent=safeColor(t.colors&&t.colors.accent?t.colors.accent:'#888888');
+    html+=`<button class="theme-opt${id===currentTheme?' active':''}" onclick="applyTheme('${esc(id)}');event.stopPropagation()"><span class="theme-opt-icon">${esc(t.icon)}</span><span>${esc(t.name)}</span><span class="theme-opt-swatch" style="background:${accent};margin-left:auto"></span></button>`;
+  });
+  html+='<div class="theme-menu-label" style="margin-top:4px">Light Themes</div>';
+  lightThemes.forEach(([id,t])=>{
+    const accent=safeColor(t.colors&&t.colors.accent?t.colors.accent:'#888888');
+    html+=`<button class="theme-opt${id===currentTheme?' active':''}" onclick="applyTheme('${esc(id)}');event.stopPropagation()"><span class="theme-opt-icon">${esc(t.icon)}</span><span>${esc(t.name)}</span><span class="theme-opt-swatch" style="background:${accent};margin-left:auto"></span></button>`;
+  });
+  menu.innerHTML=html;
+}
+
+function toggleThemeMenu(){$('themeMenu').classList.toggle('open')}
+document.addEventListener('click',e=>{
+  const picker=document.querySelector('.theme-picker');
+  if(picker&&!picker.contains(e.target)){$('themeMenu').classList.remove('open')}
+});
+
+// ══════════════════════════════════════════════════════
+// DATA LOADING
+// ══════════════════════════════════════════════════════
+async function loadData(){
+  try{
+    const r=await fetch('/api/refresh?t='+Date.now());
+    D=await r.json();
+    requestAnimationFrame(()=>render());
+    $('lastUpdate').textContent='Updated: '+new Date().toLocaleTimeString();
+    timer=60;
+    loadKanban();
+  }catch(e){
+    $('alertsSection').innerHTML='<div class="alert-item alert-critical"><span class="alert-icon">\u26A0\uFE0F</span><span class="alert-msg">Failed to load data</span></div>';
+  }
+}
+
+async function loadActionOptions(){
+  try{
+    const[cr,jr]=await Promise.all([
+      fetch('/api/containers').then(r=>r.json()).catch(()=>({containers:[]})),
+      fetch('/api/cron-jobs').then(r=>r.json()).catch(()=>({jobs:[]}))
+    ]);
+    const cs=$('containerSelect');
+    (cr.containers||[]).forEach(c=>{
+      const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);
+    });
+    const js=$('cronSelect');
+    (jr.jobs||[]).forEach(j=>{
+      const o=document.createElement('option');o.value=j.id;o.textContent=(j.enabled?'':'[off] ')+j.name;js.appendChild(o);
+    });
+  }catch(e){console.warn('Failed to load action options:',e)}
+}
+
+function toggleActionsMenu(){$('actionsMenu').classList.toggle('open')}
+document.addEventListener('click',e=>{
+  const toggle=document.querySelector('.actions-toggle');
+  if(toggle&&!toggle.contains(e.target)){$('actionsMenu').classList.remove('open')}
+});
+
+// ══════════════════════════════════════════════════════
+// ACTIONS
+// ══════════════════════════════════════════════════════
+function showActionResult(msg,isErr){
+  const el=$('actionResult');
+  el.textContent=msg;
+  el.className='action-result'+(isErr?' err':'');
+  setTimeout(()=>{el.textContent=''},5000);
+}
+
+async function restartGateway(){
+  const btn=$('restartGwBtn');
+  btn.disabled=true;btn.textContent='\u23F3 Restarting...';
+  try{
+    const r=await fetch('/api/action/restart-gateway',{method:'POST'});
+    const d=await r.json();
+    showActionResult(d.message||'Done',!d.ok);
+  }catch(e){showActionResult('Failed: '+e.message,true)}
+  finally{btn.disabled=false;btn.textContent='\uD83D\uDD04 Restart Gateway'}
+}
+
+async function restartContainer(){
+  const sel=$('containerSelect');
+  const container=sel.value;
+  if(!container){showActionResult('Select a container first',true);return}
+  try{
+    const r=await fetch('/api/action/restart-container',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container})});
+    const d=await r.json();
+    showActionResult(d.message||'Done',!d.ok);
+  }catch(e){showActionResult('Failed: '+e.message,true)}
+}
+
+async function runCron(){
+  const sel=$('cronSelect');
+  const jobId=sel.value;
+  if(!jobId){showActionResult('Select a cron job first',true);return}
+  try{
+    const r=await fetch('/api/action/run-cron',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jobId})});
+    const d=await r.json();
+    showActionResult(d.message||'Done',!d.ok);
+  }catch(e){showActionResult('Failed: '+e.message,true)}
+}
+
+// ══════════════════════════════════════════════════════
+// STATUS ROW
+// ══════════════════════════════════════════════════════
+function computeStatus(){
+  const gw=D.gateway||{};
+  const ps=D.providerStatus||{};
+  const mcps=D.mcpServers||[];
+  const v=D.systemVitals||{};
+  const crons=D.crons||[];
+
+  // Gateway
+  let gwStatus='green',gwDetail='Online, '+(gw.uptime||'--');
+  if(gw.status!=='online'){gwStatus='red';gwDetail='Offline'}
+  else if(gw.rss&&gw.rss>819200){gwStatus='yellow';gwDetail='High memory: '+(gw.memory||'?')}
+
+  // Providers
+  let provStatus='green',provDetail='';
+  const provIds=Object.keys(ps);
+  const down=provIds.filter(id=>ps[id].status==='down');
+  const degraded=provIds.filter(id=>ps[id].status==='degraded'||ps[id].cooldownRemainingMs);
+  if(down.length){
+    const primaryDown=down.some(id=>ps[id].role==='primary');
+    provStatus=primaryDown?'red':'yellow';
+    provDetail=down.map(id=>(PROVIDER_MAP[id]||{name:id}).name+' down').join(', ');
+  }else if(degraded.length){
+    provStatus='yellow';
+    provDetail=degraded.map(id=>{
+      const p=ps[id];
+      const name=(PROVIDER_MAP[id]||{name:id}).name;
+      if(p.cooldownRemainingMs)return name+' cooldown '+Math.ceil(p.cooldownRemainingMs/60000)+'m';
+      return name+' degraded';
+    }).join(', ');
+  }else{provDetail=provIds.length+' providers OK'}
+
+  // MCP
+  let mcpStatus='green',mcpDetail='';
+  const mcpBad=mcps.filter(m=>m.status!=='ok');
+  if(mcpBad.length>=3){mcpStatus='red';mcpDetail=mcpBad.length+' servers down'}
+  else if(mcpBad.length>0){mcpStatus='yellow';mcpDetail=mcpBad.map(m=>m.name.replace(/-mcp$/,'')).join(', ')+' down'}
+  else{mcpDetail=mcps.length+' servers OK'}
+
+  // System
+  let sysStatus='green',sysDetails=[];
+  const temp=v.cpuTemp,disk=v.diskUsedPct,load=parseFloat(v.loadAvg);
+  if(temp>80){sysStatus='red';sysDetails.push('CPU '+temp+'\u00B0C')}
+  else if(temp>60){if(sysStatus==='green')sysStatus='yellow';sysDetails.push('CPU '+temp+'\u00B0C')}
+  if(disk>85){sysStatus='red';sysDetails.push('Disk '+disk+'%')}
+  else if(disk>70){if(sysStatus!=='red')sysStatus='yellow';sysDetails.push('Disk '+disk+'%')}
+  if(load>4){sysStatus='red';sysDetails.push('Load '+v.loadAvg)}
+  else if(load>2){if(sysStatus!=='red')sysStatus='yellow';sysDetails.push('Load '+v.loadAvg)}
+  const sysDetail=sysDetails.length?sysDetails.join(', '):'All normal';
+
+  // Crons
+  let cronStatus='green',cronDetail='';
+  const now=Date.now();
+  const recentErrors=crons.filter(c=>c.lastStatus==='error'&&c.lastRun&&(now-c.lastRun)<86400000);
+  if(recentErrors.length>=2){cronStatus='red';cronDetail=recentErrors.length+' failures: '+recentErrors.map(c=>c.name).join(', ')}
+  else if(recentErrors.length===1){cronStatus='yellow';cronDetail=recentErrors[0].name+' failed'}
+  else{cronDetail=crons.filter(c=>c.enabled).length+' jobs OK'}
+
+  return[
+    {id:'Gateway',status:gwStatus,detail:gwDetail,target:'providersSection'},
+    {id:'Providers',status:provStatus,detail:provDetail,target:'providersSection'},
+    {id:'MCP',status:mcpStatus,detail:mcpDetail,target:'providersSection'},
+    {id:'System',status:sysStatus,detail:sysDetail,target:'cronsSection'},
+    {id:'Crons',status:cronStatus,detail:cronDetail,target:'cronsSection'},
+  ];
+}
+
+function renderStatusRow(){
+  const indicators=computeStatus();
+  const row=$('statusRow');
+  row.innerHTML=indicators.map(ind=>
+    `<div class="status-indicator" onclick="document.getElementById('${ind.target}').scrollIntoView({behavior:'smooth'})">
+      <div class="status-dot ${ind.status}"></div>
+      <div class="status-label">${esc(ind.id)}</div>
+      <div class="status-detail">${esc(ind.detail)}</div>
+    </div>`
+  ).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// MAIN RENDER
+// ══════════════════════════════════════════════════════
+function render(){
+  const gw=D.gateway||{};
+  const on=gw.status==='online';
+
+  // Header
+  $('botName').textContent=D.botName||'OpenClaw Dashboard';
+  $('botEmoji').textContent=D.botEmoji||'\u26A1';
+  document.title=D.botName||'OpenClaw Dashboard';
+  $('statusDot').className='hdr-dot '+(on?'on':'off');
+  $('statusText').textContent=on?'Online':'Offline';
+  $('statusText').style.color=on?'var(--green)':'var(--red)';
+  $('hUptime').textContent=gw.uptime||'--';
+  $('hSessions').textContent=(D.sessionCount||0)+' sessions';
+  $('hMemory').textContent=gw.memory||'--';
+  $('headerSpend').textContent='$'+(D.totalCostToday||0).toFixed(2)+' today';
+
+  renderStatusRow();
+  renderProviders();
+  renderAgents();
+  renderFeed();
+  renderCost();
+  renderAlerts();
+  renderKanban();
+  renderCrons();
+  renderDetails();
+}
+
+// ══════════════════════════════════════════════════════
+// PROVIDERS
+// ══════════════════════════════════════════════════════
+function renderProviders(){
+  const ps=D.providerStatus||{};
+  const pc=D.providerCalls||{};
+  const pt=D.providerTokens||{};
+  const PROVIDER_ORDER=['github-copilot','openai-codex','kimi-coding','openrouter','anthropic'];
+  const ids=PROVIDER_ORDER.filter(id=>ps[id]).concat(Object.keys(ps).filter(id=>!PROVIDER_ORDER.includes(id)));
+  if(!ids.length){$('providerGrid').innerHTML='<div class="empty">No providers</div>';return}
+  $('providerGrid').innerHTML=ids.map(id=>{
+    const p=ps[id]||{};
+    const info=PROVIDER_MAP[id]||{icon:'\uD83D\uDD27',name:id};
+    const st=p.status||'ok';
+    const col=STATUS_COLOR[st]||'var(--dim)';
+    const todayCalls=(pc.today&&pc.today[id])||0;
+    let quotaHtml='';
+    // Copilot premium bar
+    if(id==='github-copilot'&&p.premiumLimit){
+      const pct=Math.round((p.premiumUsed||0)/p.premiumLimit*100);
+      const barCol=pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)';
+      quotaHtml=`<div class="prov-quota"><div class="prov-quota-bar"><div class="prov-quota-fill" style="width:${pct}%;background:${barCol}"></div></div><div class="prov-quota-label"><span>${p.premiumUsed}/${p.premiumLimit} premium</span><span>${p.premiumRemaining||0} left</span></div></div>`;
+    }
+    // OWALF daily token bar
+    if(id==='openai-codex'){
+      const tokToday=(pt.today&&pt.today[id])||0;
+      const peak=(pt.dailyPeak&&pt.dailyPeak[id])||0;
+      const ref=peak>0?peak:23000000;
+      const pct=Math.min(100,Math.round(tokToday/ref*100));
+      const barCol=pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)';
+      const fmtTok=t=>t>=1e6?(t/1e6).toFixed(1)+'M':t>=1e3?Math.round(t/1e3)+'K':t;
+      quotaHtml=`<div class="prov-quota"><div class="prov-quota-bar"><div class="prov-quota-fill" style="width:${pct}%;background:${barCol}"></div></div><div class="prov-quota-label"><span>${fmtTok(tokToday)} tokens</span><span>~${pct}%</span></div></div>`;
+    }
+    let alertHtml='';
+    if(p.cooldownRemainingMs){
+      alertHtml=`<div class="prov-alert">\u23F1 Cooldown: ${Math.ceil(p.cooldownRemainingMs/60000)}m</div>`;
+    }
+    return `<div class="prov-card s-${esc(st)}"><div class="prov-top"><span class="prov-name">${info.icon} ${esc(info.name)}</span><span class="prov-status" style="color:${col}">\u25CF ${esc(st)}</span></div><div class="prov-calls">${todayCalls} calls today</div>${quotaHtml}${alertHtml}</div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// AGENTS
+// ══════════════════════════════════════════════════════
+function renderAgents(){
+  const ac=D.agentConfig||{};
+  const agents=ac.agents||[];
+  $('agentCount').textContent=agents.length+' agents';
+  if(!agents.length){$('agentGrid').innerHTML='<div class="empty">No agents</div>';return}
+  const sessions=D.sessions||[];
+  const now=Date.now();
+  $('agentGrid').innerHTML=agents.map(a=>{
+    const emoji=AGENT_ICON_MAP[a.id]||'\uD83E\uDD16';
+    const raw=(a.model||'').split('/').pop()||'--';
+    const modelShort=raw.replace(/^gpt-(\d+\.\d+)/,'gpt-$1').replace(/^(gpt-\d+\.\d+)-codex.*/,'$1-codex').replace(/^(gpt-\d+\.\d+)(?!-codex).*$/,'$1');
+    let lastTs=0;
+    sessions.forEach(s=>{
+      if(!(s.name||'').toLowerCase().includes(a.id))return;
+      const upd=s.updatedAt?new Date(s.updatedAt).getTime():0;
+      if(upd>lastTs)lastTs=upd;
+    });
+    const isActive=lastTs>0&&(now-lastTs)<1800000;
+    const lastLabel=lastTs>0?relTime(lastTs):'--';
+    const desc=AGENT_DESC[a.id]||'';
+    const tipName=AGENT_NAME[a.id]||a.id;
+    return `<div class="agent-card" onclick="toggleAgentTip(this,event)">
+      <div class="agent-dot ${isActive?'active':'idle'}"></div>
+      <span class="agent-emoji">${emoji}</span>
+      <div class="agent-id">${esc(a.id)}</div>
+      <div class="agent-model">${esc(modelShort)}</div>
+      <div class="agent-last">${isActive?'active':lastLabel}</div>
+      <div class="agent-tip"><div class="agent-tip-name">${esc(tipName)}</div><div class="agent-tip-desc">${esc(desc)}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAgentTip(card,e){
+  e.stopPropagation();
+  const isMobile=window.innerWidth<768;
+  const wasOpen=card.classList.contains('tip-open');
+  document.querySelectorAll('.agent-card.tip-open').forEach(c=>c.classList.remove('tip-open'));
+  const bar=$('agentBar');
+  if(wasOpen){bar.style.display='none';return}
+  card.classList.add('tip-open');
+  if(isMobile){
+    const tip=card.querySelector('.agent-tip');
+    if(tip){bar.innerHTML=tip.innerHTML;bar.style.display='block'}
+  }
+}
+document.addEventListener('click',()=>{
+  document.querySelectorAll('.agent-card.tip-open').forEach(c=>c.classList.remove('tip-open'));
+  const bar=$('agentBar');if(bar)bar.style.display='none';
+});
+
+// ══════════════════════════════════════════════════════
+// FEED
+// ══════════════════════════════════════════════════════
+function renderFeed(){
+  const feed=D.activityFeed||[];
+  $('feedCount').textContent=feed.length+' events';
+  if(!feed.length){$('feedList').innerHTML='<div class="empty">No activity</div>';return}
+  const cutoff=Date.now()-12*3600*1000;
+  const recent=feed.filter(f=>{
+    if(!f.timestamp)return true;
+    return new Date(f.timestamp).getTime()>cutoff;
+  });
+  if(!recent.length){$('feedList').innerHTML='<div class="empty">No activity in last 12h</div>';return}
+  $('feedList').innerHTML=recent.map(f=>{
+    const t=f.time||'';
+    const agentHtml=f.agent?`<span class="feed-agent">${esc(f.agent)}</span>`:'';
+    const descHtml=f.description?`<div class="feed-desc">${esc(f.description)}</div>`:'';
+    return `<div class="feed-item"><span class="feed-time">${esc(t)}</span><span class="feed-icon">${esc(f.icon||'\u2022')}</span><div class="feed-body">${agentHtml}<span class="feed-msg">${esc(f.message||'')}</span>${descHtml}</div></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// COST
+// ══════════════════════════════════════════════════════
+function renderCost(){
+  const today=D.totalCostToday||0;
+  const sp=D.providerSpend||{};
+  const week=Object.values(sp['7d']||{}).reduce((a,v)=>a+v,0);
+  const month=Object.values(sp['30d']||{}).reduce((a,v)=>a+v,0);
+  const projected=D.projectedMonthly||0;
+  const breakdown=D.costBreakdownToday||[];
+
+  let breakdownHtml='';
+  if(breakdown.length){
+    breakdownHtml=`<div class="cost-divider"></div><button class="cost-expand-btn" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'\u25BE By model':'\u25B8 By model'">\u25B8 By model</button><div class="cost-breakdown">${breakdown.map(b=>`<div class="cost-breakdown-row"><span class="cost-breakdown-model">${esc(b.model)}</span><span class="cost-breakdown-value">$${b.cost.toFixed(2)}</span></div>`).join('')}</div>`;
+  }
+
+  $('costPanel').innerHTML=
+    `<div class="cost-row"><span class="cost-label">Today</span><span class="cost-value">$${today.toFixed(2)}</span></div>`+
+    `<div class="cost-row"><span class="cost-label">7 day</span><span class="cost-value">$${week.toFixed(2)}</span></div>`+
+    `<div class="cost-row"><span class="cost-label">30 day</span><span class="cost-value">$${month.toFixed(2)}</span></div>`+
+    `<div class="cost-row"><span class="cost-label">Projected</span><span class="cost-value projected">$${projected.toFixed(0)}/mo</span></div>`+
+    breakdownHtml;
+}
+
+// ══════════════════════════════════════════════════════
+// ALERTS
+// ══════════════════════════════════════════════════════
+function renderAlerts(){
+  const alerts=D.alerts||[];
+  const visible=alerts.filter((a,i)=>!dismissedAlerts.has(i));
+  if(!visible.length){$('alertsSection').innerHTML='';return}
+  $('alertsSection').innerHTML=visible.map((a,i)=>{
+    const idx=alerts.indexOf(a);
+    return `<div class="alert-item alert-${esc(a.severity)||'low'}"><span class="alert-icon">${esc(a.icon)||'\u2139\uFE0F'}</span><span class="alert-msg">${esc(a.message)}</span><button class="alert-dismiss" onclick="dismissedAlerts.add(${idx});renderAlerts()" title="Dismiss">\u2715</button></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// KANBAN
+// ══════════════════════════════════════════════════════
+async function loadKanban(){
+  try{
+    const r=await fetch('/api/kanban');
+    if(!r.ok)return;
+    kanbanData=await r.json();
+    renderKanban();
+  }catch(e){console.warn('kanban fetch failed:',e)}
+}
+
+function renderKanban(){
+  if(!kanbanData||kanbanData.error)return;
+  const{columns,stats}=kanbanData;
+  const agentStr=Object.entries(stats.agent_counts||{}).map(([a,n])=>`${AGENT_EMOJI[a]||''}${a}(${n})`).join(' ');
+  $('kanbanStats').innerHTML=
+    `<span>Active: <span class="ks-val">${stats.active}</span></span>`+
+    `<span>Today: <span class="ks-val">${stats.completed_today} done</span></span>`+
+    `<span>Avg: <span class="ks-val">${stats.avg_completion_minutes}min</span></span>`+
+    (agentStr?`<span>Agents: <span class="ks-val">${agentStr}</span></span>`:'');
+  for(const col of KANBAN_COLS){
+    const cards=columns[col]||[];
+    const cap=col==='in_progress'?'InProgress':col.charAt(0).toUpperCase()+col.slice(1);
+    const countEl=$('kCnt'+cap);
+    const bodyEl=$('kBody'+cap);
+    if(countEl)countEl.textContent=cards.length;
+    if(!bodyEl)continue;
+    bodyEl.innerHTML=cards.map(c=>renderKanbanCard(c)).join('');
+  }
+}
+
+function renderKanbanCard(c){
+  const agent=(c.agent||'').toLowerCase();
+  const agentCls=AGENT_CLASS[agent]||'a-other';
+  const agentLabel=`${AGENT_EMOJI[agent]||''} ${c.agent||'\u2014'}`;
+  const priCls='p-'+(c.priority||'normal').toLowerCase();
+  const sourceIcon=SOURCE_ICON[(c.source||'').toLowerCase()]||'';
+  let timeStr='';
+  if(c.status==='done'&&c.actual_minutes!=null){timeStr=`\u2713 ${c.actual_minutes}min`}
+  else if(c.estimated_minutes!=null){timeStr=`\u23F1 ~${c.estimated_minutes}min`}
+  const attemptsStr=(c.attempts&&c.attempts>1)?`<span class="kanban-card-attempts">attempt ${c.attempts}/${c.max_attempts||3}</span>`:'';
+  const borderColors={critical:'#ef4444',high:'#f97316',normal:'#facc15',low:'#737373'};
+  const borderColor=borderColors[(c.priority||'normal').toLowerCase()]||'#facc15';
+  return `<div class="kanban-card" style="--card-accent:${borderColor}" onclick="openKanbanModal(${c.id})">
+    <div class="kanban-card-title" title="${esc(c.title||'')}">${esc(c.title||'\u2014')}</div>
+    <div class="kanban-card-meta">
+      <span class="kanban-card-agent ${agentCls}">${agentLabel}</span>
+      <span class="kanban-card-priority ${priCls}"></span>
+      ${sourceIcon?`<span class="kanban-card-source">${sourceIcon}</span>`:''}
+      ${attemptsStr}
+      <span class="kanban-card-time">${timeStr}</span>
+    </div>
+  </div>`;
+}
+
+async function openKanbanModal(taskId){
+  const modal=$('kanbanModal');
+  const content=$('kanbanModalContent');
+  modal.classList.add('open');
+  let card=null;
+  if(kanbanData&&kanbanData.columns){
+    for(const col of Object.values(kanbanData.columns)){
+      const found=col.find(c=>c.id===taskId);
+      if(found){card=found;break}
+    }
+  }
+  if(!card){
+    content.innerHTML='<div class="empty">Loading...</div>';
+    try{const r=await fetch(`/api/kanban/task/${taskId}`);card=await r.json()}
+    catch(e){content.innerHTML='<div class="empty">Failed to load task</div>';return}
+  }
+  const fields=[
+    ['Title',card.title],['Status',card.status],['Type',card.type],
+    ['Priority',card.priority],['Agent',card.agent],['Source',card.source],
+    ['Skill',card.skill],['Tools',card.tools],
+    ['Acceptance Criteria',card.acceptance_criteria],['Result',card.result],
+    ['Attempts',card.attempts?`${card.attempts}/${card.max_attempts||3}`:'0'],
+    ['Created',card.created_at],['Started',card.started_at],['Completed',card.completed_at],
+    ['Time',card.actual_minutes!=null?`${card.actual_minutes}min (est. ${card.estimated_minutes||'?'}min)`:(card.estimated_minutes?`est. ${card.estimated_minutes}min`:'')],
+    ['Channel',card.channel],['Session Key',card.session_key],['Notes',card.notes],
+  ].filter(([,v])=>v);
+  content.innerHTML=`<div class="kanban-modal-title">${esc(card.title||'Task')}</div>`+
+    fields.map(([label,value])=>
+      `<div class="kanban-modal-field"><div class="kanban-modal-label">${esc(label)}</div><div class="kanban-modal-value">${esc(value)}</div></div>`
+    ).join('');
+}
+
+function closeKanbanModal(){$('kanbanModal').classList.remove('open')}
+
+// ══════════════════════════════════════════════════════
+// CRONS
+// ══════════════════════════════════════════════════════
+function renderCrons(){
+  const crons=D.crons||[];
+  $('cronCount').textContent=crons.length+' jobs';
+  // Desktop table
+  $('cronBody').innerHTML=crons.map(c=>{
+    const st=c.lastStatus;
+    const dotCls=st==='ok'?'sd-ok':st==='error'?'sd-error':st==='none'?'sd-none':'sd-pending';
+    const tip=c.lastError?` data-tip="${esc(c.lastError)}"`:'';
+    const dur=c.lastDurationMs?((c.lastDurationMs/1000).toFixed(1)+'s'):'\u2014';
+    return `<tr><td><span class="sd ${dotCls}"${tip}></span>${esc(st)||'\u2014'}</td><td class="w">${esc(c.name)}</td><td>${esc(c.schedule)}</td><td>${esc(c.lastRun||'\u2014')}</td><td>${esc(c.nextRun||'\u2014')}</td><td class="r">${dur}</td><td>${esc(c.model||'\u2014')}</td></tr>`;
+  }).join('');
+  // Mobile cards
+  $('cronCards').innerHTML=crons.map(c=>{
+    const st=c.lastStatus;
+    const cls=st==='ok'?'cron-ok':st==='error'?'cron-error':'';
+    const dur=c.lastDurationMs?((c.lastDurationMs/1000).toFixed(1)+'s'):'\u2014';
+    return `<div class="cron-card ${cls}"><div class="cron-card-name">${esc(c.name)}</div><div class="cron-card-meta"><span>${esc(c.schedule)}</span><span>Last: ${esc(c.lastRun||'\u2014')}</span><span>${dur}</span><span>${esc(c.model||'')}</span></div></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// DETAILS ACCORDION
+// ══════════════════════════════════════════════════════
+function openDetailTab(panelId){
+  document.querySelectorAll('.details-panel').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.details-tab').forEach(t=>t.classList.remove('active'));
+  const panel=$(panelId);
+  if(panel)panel.style.display='block';
+  const tab=document.querySelector(`.details-tab[data-panel="${panelId}"]`);
+  if(tab)tab.classList.add('active');
+  localStorage.setItem('ocDashDetailTab',panelId);
+  renderDetails();
+}
+
+function renderDetails(){
+  renderSubAgentRuns();
+  renderSkills();
+  renderGitLog();
+  renderCharts();
+}
+
+// ── Sub-Agent Runs ──
+function renderSubAgentRuns(){
+  setTabCls4('srTab',srTab,'active-purple');
+  const runs=srTab==='today'?(D.subagentRunsToday||[]):srTab==='7d'?(D.subagentRuns7d||[]):srTab==='30d'?(D.subagentRuns30d||[]):(D.subagentRuns||[]);
+  $('srEmpty').style.display=runs.length?'none':'block';
+  $('srBody').innerHTML=runs.slice(0,20).map(r=>{
+    const dur=r.durationSec>=3600?(r.durationSec/3600).toFixed(1)+'h':r.durationSec>=60?Math.round(r.durationSec/60)+'m':r.durationSec+'s';
+    return `<tr><td class="w" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.task)}</td><td>${esc(r.model)}</td><td class="r">${dur}</td><td><span class="badge badge-ok">${esc(r.status)}</span></td><td>${esc(r.timestamp)}</td></tr>`;
+  }).join('');
+}
+
+function setTabCls4(prefix,tab,cls){
+  $(prefix+'T').className='tab-btn'+(tab==='today'?' '+cls:'');
+  $(prefix+'7').className='tab-btn'+(tab==='7d'?' '+cls:'');
+  $(prefix+'30').className='tab-btn'+(tab==='30d'?' '+cls:'');
+  $(prefix+'A').className='tab-btn'+(tab==='all'?' '+cls:'');
+}
+
+// ── Skills ──
+function renderSkills(){
+  const allSkills=D.skills||[];
+  if(!allSkills.length){$('skillsGrid').innerHTML='<div class="empty">No skills</div>';return}
+  const byAgent={};
+  allSkills.forEach(s=>{const a=s.agent||'unknown';(byAgent[a]=byAgent[a]||[]).push(s)});
+  const agentOrder=['main','steward','coder','housekeeper','automator','pm','researcher','scribe','seo','ads','fpl'];
+  const sorted=Object.keys(byAgent).sort((a,b)=>{const ai=agentOrder.indexOf(a),bi=agentOrder.indexOf(b);return(ai<0?99:ai)-(bi<0?99:bi)});
+  $('skillsGrid').innerHTML=sorted.map(agent=>{
+    const name=AGENT_NAME[agent]||agent;
+    const tags=byAgent[agent].map(s=>{
+      const c=s.active?'color:var(--green);border-color:rgba(74,222,128,.2);background:rgba(74,222,128,.05)':'color:var(--dim);border-color:var(--border)';
+      return `<span class="skill-tag" style="${c}">${esc(s.name)}</span>`;
+    }).join('');
+    return `<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;color:var(--textStrong);margin-right:6px">${esc(name)}</span>${tags}</div>`;
+  }).join('');
+}
+
+// ── Git Log ──
+function renderGitLog(){
+  $('gitPanel').innerHTML=(D.gitLog||[]).slice(0,5).map(g=>
+    `<div class="git-item"><span class="git-hash">${esc(g.hash)}</span><span class="git-msg" title="${esc(g.message)}">${esc(g.message)}</span><span class="git-ago">${esc(g.ago)}</span></div>`
+  ).join('')||'<div class="empty">No git history</div>';
+}
+
+// ── Charts ──
+function renderCharts(){
+  $('cTab7').className='tab-btn'+(chartDays===7?' active':'');
+  $('cTab30').className='tab-btn'+(chartDays===30?' active':'');
+  const data=(D.dailyChart||[]).slice(-chartDays);
+  if(!data.length){$('callChart').innerHTML='<div class="empty">No chart data</div>';return}
+  renderCallVolumeChart('callChart',data);
+}
+
+function renderCallVolumeChart(id,data){
+  const W=600,H=300,P={t:20,r:20,b:55,l:50};
+  const cw=W-P.l-P.r,ch=H-P.t-P.b;
+  const providers=new Set();
+  data.forEach(d=>{if(d.models)Object.keys(d.models).forEach(m=>providers.add(m))});
+  const pList=[...providers];
+  const maxY=Math.max(...data.map(d=>{
+    if(!d.models)return d.calls||0;
+    return Object.values(d.models).reduce((a,v)=>a+(typeof v==='object'?v.calls||0:0),0)||(d.calls||0);
+  }))||1;
+  const barW=cw/data.length*0.7,gap=cw/data.length*0.3;
+  let bars='';
+  data.forEach((d,i)=>{
+    let cum=0;const x=P.l+i*(barW+gap)+gap/2;
+    if(d.models&&pList.length){
+      pList.forEach((m,mi)=>{
+        const entry=(d.models||{})[m];
+        const v=typeof entry==='object'?(entry.calls||0):(typeof entry==='number'?entry:0);
+        const h=(v/maxY)*ch;
+        bars+=`<rect x="${x}" y="${P.t+ch-cum-h}" width="${barW}" height="${h}" fill="${COLORS[mi%COLORS.length]}" opacity="0.8"><title>${esc(d.label)} ${esc(m)}: ${v} calls</title></rect>`;
+        cum+=h;
+      });
+    }else{
+      const v=d.calls||0;const h=(v/maxY)*ch;
+      bars+=`<rect x="${x}" y="${P.t+ch-h}" width="${barW}" height="${h}" fill="var(--accent)" opacity="0.8"><title>${esc(d.label)}: ${v} calls</title></rect>`;
+    }
+  });
+  const yLabels=Array.from({length:5},(_,i)=>{const v=Math.round(maxY*i/4);const y=P.t+ch-ch*i/4;return`<text x="${P.l-6}" y="${y+3}" text-anchor="end" fill="var(--dim)" font-size="9">${v}</text><line x1="${P.l}" y1="${y}" x2="${W-P.r}" y2="${y}" stroke="var(--border)" stroke-dasharray="2"/>`}).join('');
+  const nth=Math.ceil(data.length/7);
+  const xLabels=data.map((d,i)=>i%nth===0?`<text x="${P.l+i*(barW+gap)+gap/2+barW/2}" y="${H-P.b+16}" text-anchor="middle" fill="var(--dim)" font-size="9">${esc(d.label)}</text>`:'').join('');
+  const legend=pList.map((m,i)=>`<span class="chart-legend-item"><span class="chart-legend-dot" style="background:${COLORS[i%COLORS.length]}"></span>${esc(m)}</span>`).join('');
+  $(id).innerHTML=`<div class="chart-title">Daily API Calls</div><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:310px">${yLabels}${xLabels}${bars}</svg><div class="chart-legend">${legend}</div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// AI CHAT
+// ══════════════════════════════════════════════════════
+function toggleChat(){
+  const panel=$('chatPanel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open'))$('chatInput').focus();
+}
+
+function appendMessage(role,text){
+  const msgs=$('chatMessages');
+  const div=document.createElement('div');
+  div.className='chat-bubble '+role;
+  div.textContent=text;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+
+async function sendChat(prefill){
+  const input=$('chatInput');
+  const question=(prefill!==undefined?prefill:input.value).trim();
+  if(!question)return;
+  input.value='';
+  $('chatSend').disabled=true;
+  appendMessage('user',question);
+  const thinking=appendMessage('thinking','\u2026');
+  try{
+    const res=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question,history:chatHistory.slice(-CHAT_MAX_HISTORY)}),
+    });
+    const data=await res.json();
+    thinking.remove();
+    if(data.answer){
+      appendMessage('assistant',data.answer);
+      chatHistory.push({role:'user',content:question});
+      chatHistory.push({role:'assistant',content:data.answer});
+      if(chatHistory.length>CHAT_MAX_HISTORY*2)chatHistory=chatHistory.slice(-CHAT_MAX_HISTORY*2);
+    }else{
+      appendMessage('error','Error: '+(data.error||'Unknown error'));
+    }
+  }catch(e){
+    thinking.remove();
+    appendMessage('error','Network error: '+e.message);
+  }finally{
+    $('chatSend').disabled=false;
+    input.focus();
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// COUNTDOWN + INIT
+// ══════════════════════════════════════════════════════
+setInterval(()=>{timer--;if(timer<=0){loadData();timer=60}$('countdown').textContent=timer+'s'},1000);
+loadData();
+loadActionOptions();
+loadThemes();
+
+// Restore last open detail tab
+const savedTab=localStorage.getItem('ocDashDetailTab');
+if(savedTab)openDetailTab(savedTab);
+</script>
+
+<!-- AI Chat FAB + Panel -->
+<button class="chat-fab" id="chatBtn" onclick="toggleChat()" title="Ask AI about your dashboard">&#x1F4AC;</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <span class="chat-header-title">&#x1F916; Dashboard AI</span>
+    <button class="chat-close" onclick="toggleChat()">&#x2715;</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-bubble assistant">Hi! Ask me anything about your dashboard &mdash; providers, sessions, crons, or configuration.</div>
+  </div>
+  <div class="chat-quick" id="chatQuick">
+    <button class="chat-chip" onclick="sendChat('Summarize provider status')">Provider status</button>
+    <button class="chat-chip" onclick="sendChat('Are there any alerts or issues?')">Alerts</button>
+    <button class="chat-chip" onclick="sendChat('Show agent activity summary')">Agents</button>
+    <button class="chat-chip" onclick="sendChat('What is the gateway status and uptime?')">Gateway</button>
+  </div>
+  <div class="chat-input-row">
+    <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ask about providers, agents, crons..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+    <button class="chat-send" id="chatSend" onclick="sendChat()">&#x2191;</button>
+  </div>
+</div>
+</body>
+</html>
