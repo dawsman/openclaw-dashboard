@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0f">
+<title>Holly — Operations Dashboard</title>
+<style>
+/* === Reset & Base === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0f;
+  --surface: rgba(255,255,255,0.03);
+  --surfaceHover: rgba(255,255,255,0.045);
+  --border: rgba(255,255,255,0.06);
+  --accent: #6366f1;
+  --accent2: #9333ea;
+  --green: #4ade80;
+  --yellow: #facc15;
+  --red: #f87171;
+  --orange: #fb923c;
+  --purple: #a78bfa;
+  --text: #e5e5e5;
+  --textStrong: #ffffff;
+  --muted: #737373;
+  --dim: #525252;
+  --darker: #404040;
+  --tableBg: rgba(255,255,255,0.025);
+  --tableHover: rgba(255,255,255,0.05);
+  --scrollThumb: rgba(255,255,255,0.1);
+}
+
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Helvetica Neue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: contain;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollThumb); border-radius: 3px; }
+
+/* === Layout === */
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 12px 24px;
+}
+
+/* === Animations === */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.fade-in { animation: fade-in 0.3s ease; }
+
+/* === Pull to Refresh === */
+.ptr-indicator {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 8px;
+  height: 0;
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+.ptr-indicator.visible { height: 36px; }
+
+/* === 1. Header Bar === */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 10px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+}
+.header.loading { animation: loading-pulse 1s infinite; }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.header-emoji { font-size: 1.5rem; line-height: 1; }
+.header-name { font-size: 1.25rem; font-weight: 700; color: var(--textStrong); }
+
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.health-pill.green { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+.health-pill.amber { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow); }
+.health-pill.red { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.updated-text { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+
+.theme-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px;
+  color: var(--muted);
+  position: relative;
+}
+.theme-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  z-index: 200;
+  min-width: 170px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.theme-dropdown.open { display: block; }
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.theme-option:hover { background: var(--surfaceHover); }
+.theme-option.active { color: var(--accent); font-weight: 600; }
+
+/* === 2. System Strip === */
+.system-strip {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.system-strip::-webkit-scrollbar { display: none; }
+
+.metric-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.metric-pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-green { background: var(--green); }
+.dot-amber { background: var(--yellow); }
+.dot-red { background: var(--red); }
+.dot-accent { background: var(--accent); }
+
+/* === 3. Alert Banner === */
+.alert-banner {
+  margin: 8px 0;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
+  background: color-mix(in srgb, var(--red) 6%, var(--surface));
+  overflow: hidden;
+}
+.alert-banner[hidden] { display: none; }
+.alert-banner summary {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--red);
+  cursor: pointer;
+  list-style: none;
+}
+.alert-banner summary::-webkit-details-marker { display: none; }
+.alert-banner summary::before { content: ''; }
+.alert-list {
+  padding: 0 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  padding: 6px 8px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+.alert-item .alert-icon { flex-shrink: 0; }
+
+/* === 4. Agent Grid === */
+.section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--textStrong);
+  padding: 14px 0 8px;
+  letter-spacing: 0.02em;
+}
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (min-width: 768px) { .agent-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1200px) { .agent-grid { grid-template-columns: repeat(4, 1fr); } }
+
+.agent-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: background 0.15s;
+}
+.agent-card[open] { background: var(--surfaceHover); }
+
+.agent-card summary {
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agent-card summary::-webkit-details-marker { display: none; }
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agent-emoji { font-size: 1.6rem; line-height: 1; }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-size: 0.9rem; font-weight: 700; color: var(--textStrong); }
+.agent-activity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.activity-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.activity-dot.active {
+  background: var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.activity-time { font-size: 0.65rem; color: var(--muted); }
+
+.agent-role {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 40px;
+  margin-top: -2px;
+}
+
+/* Agent expanded content */
+.agent-details {
+  padding: 0 12px 12px;
+  animation: fade-in 0.2s ease;
+}
+.agent-model {
+  font-size: 0.7rem;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.agent-tagline {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: 8px;
+}
+.agent-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.agent-cron-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.cron-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  color: var(--text);
+}
+.cron-row .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cron-row .cron-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cron-row .cron-ago { color: var(--muted); flex-shrink: 0; font-size: 0.65rem; }
+
+.skill-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.skill-pill {
+  padding: 2px 8px;
+  background: var(--tableBg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+/* === 5. Today's Schedule === */
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.schedule-row:hover { background: var(--surfaceHover); }
+.schedule-time {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  width: 42px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.schedule-icon { width: 16px; text-align: center; flex-shrink: 0; font-size: 0.85rem; }
+.schedule-icon.done { color: var(--green); }
+.schedule-icon.error { color: var(--red); }
+.schedule-icon.upcoming { color: var(--dim); }
+.schedule-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.schedule-agent { font-size: 0.7rem; color: var(--muted); flex-shrink: 0; }
+
+.show-all-btn {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-top: 4px;
+  text-align: center;
+}
+.show-all-btn:hover { background: var(--surfaceHover); color: var(--text); }
+
+.empty-state {
+  text-align: center;
+  padding: 16px;
+  color: var(--dim);
+  font-size: 0.8rem;
+}
+
+/* === 6. Services === */
+.services-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.service-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+.service-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.service-name { font-weight: 600; color: var(--textStrong); }
+.service-detail { color: var(--muted); margin-left: auto; font-size: 0.75rem; }
+
+.mcp-failures {
+  padding-left: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mcp-fail-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.mcp-fail-row .dot { width: 6px; height: 6px; }
+
+/* === 7. Activity Feed === */
+.feed-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+@media (min-width: 768px) { .feed-list { max-height: 400px; } }
+
+.feed-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.feed-row:hover { background: var(--surfaceHover); }
+.feed-time {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.feed-icon { width: 18px; text-align: center; flex-shrink: 0; }
+.feed-msg { flex: 1; min-width: 0; color: var(--text); word-break: break-word; }
+
+/* === Section Dividers === */
+.section {
+  margin-top: 4px;
+}
+</style>
+</head>
+<body>
+
+<div class="ptr-indicator" id="ptrIndicator">Pull to refresh...</div>
+
+<div class="container" id="app">
+  <!-- 1. Header -->
+  <header class="header" id="header">
+    <div class="header-left">
+      <span class="header-emoji" id="headerEmoji"></span>
+      <span class="header-name" id="headerName"></span>
+      <span class="health-pill" id="healthPill"></span>
+    </div>
+    <div class="header-meta">
+      <span class="updated-text" id="updatedText"></span>
+      <button class="theme-btn" id="themeBtn" aria-label="Change theme">
+        &#9881;
+        <div class="theme-dropdown" id="themeDropdown"></div>
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. System Strip -->
+  <div class="system-strip" id="systemStrip"></div>
+
+  <!-- 3. Alert Banner -->
+  <details class="alert-banner" id="alertBanner" hidden>
+    <summary id="alertSummary"></summary>
+    <div class="alert-list" id="alertList"></div>
+  </details>
+
+  <!-- 4. Agent Grid -->
+  <div class="section">
+    <div class="section-title">Agents</div>
+    <div class="agent-grid" id="agentGrid"></div>
+  </div>
+
+  <!-- 5. Today's Schedule -->
+  <div class="section">
+    <div class="section-title">Today's Schedule</div>
+    <div id="scheduleContainer"></div>
+  </div>
+
+  <!-- 6. Services -->
+  <div class="section">
+    <div class="section-title">Services</div>
+    <div class="services-list" id="servicesList"></div>
+  </div>
+
+  <!-- 7. Activity Feed -->
+  <div class="section">
+    <div class="section-title">Recent Activity</div>
+    <div id="feedContainer"></div>
+  </div>
+</div>
+
+<script>
+/* =============================================
+   Holly v3 Operations Dashboard
+   Single-file, no dependencies
+   ============================================= */
+
+// --- State ---
+let DATA = null;
+let THEMES = null;
+let lastFetchMs = 0;
+let refreshTimer = null;
+let tickTimer = null;
+
+// --- Helpers ---
+function timeAgo(ms) {
+  if (!ms) return 'idle';
+  const diff = Date.now() - ms;
+  if (diff < 0) return 'just now';
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return Math.floor(diff / 86400000) + 'd ago';
+}
+
+function simplifyModel(m) {
+  if (!m) return 'Unknown';
+  let s = m.replace(/^[^/]+\//, '');
+  // Specific common transforms
+  s = s.replace(/^claude-sonnet-/, 'Sonnet ');
+  s = s.replace(/^claude-opus-/, 'Opus ');
+  s = s.replace(/^claude-/, 'Claude ');
+  s = s.replace(/^gpt-/, 'GPT ');
+  s = s.replace(/^gemini-/, 'Gemini ');
+  s = s.replace(/^gpt-5-mini$/, 'GPT 5 Mini');
+  // Capitalize remaining words split by dash
+  if (!/[A-Z]/.test(s.charAt(0))) {
+    s = s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  } else {
+    s = s.replace(/-/g, ' ');
+  }
+  return s;
+}
+
+function parseUptime(s) {
+  if (!s) return 'N/A';
+  // "4-12:30:00" or "01:24:06"
+  let days = 0, hours = 0, mins = 0;
+  if (s.includes('-')) {
+    const [d, rest] = s.split('-');
+    days = parseInt(d, 10);
+    const parts = rest.split(':');
+    hours = parseInt(parts[0], 10);
+    mins = parseInt(parts[1], 10);
+  } else {
+    const parts = s.split(':');
+    hours = parseInt(parts[0], 10);
+    mins = parseInt(parts[1], 10);
+  }
+  if (days > 0) return days + 'd ' + hours + 'h';
+  if (hours > 0) return hours + 'h ' + mins + 'm';
+  return mins + 'm';
+}
+
+function escHtml(s) {
+  const el = document.createElement('span');
+  el.textContent = s;
+  return el.innerHTML;
+}
+
+function cronTimeForDate(cronEntry, dateStr) {
+  // Parse lastRun/nextRun which look like "2026-03-22 12:00"
+  // Return "HH:MM" if the date portion matches dateStr
+  const lr = cronEntry.lastRun || '';
+  const nr = cronEntry.nextRun || '';
+  const times = [];
+  if (lr.startsWith(dateStr)) {
+    times.push({ time: lr.slice(11, 16), status: cronEntry.lastStatus, name: cronEntry.name, agentId: cronEntry.agentId, type: 'past' });
+  }
+  if (nr.startsWith(dateStr) && nr !== lr) {
+    times.push({ time: nr.slice(11, 16), status: 'upcoming', name: cronEntry.name, agentId: cronEntry.agentId, type: 'future' });
+  }
+  return times;
+}
+
+function agentNameById(id) {
+  if (!DATA) return id;
+  const ai = DATA.agentIdentities || {};
+  if (ai[id] && ai[id].name) return ai[id].name;
+  return id;
+}
+
+function formatDuration(ms) {
+  if (!ms || ms <= 0) return '';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+}
+
+// --- Health Logic ---
+function computeHealth(d) {
+  if (!d) return { level: 'red', label: 'No data' };
+  const gwOffline = !d.gateway || d.gateway.status !== 'online';
+  const alerts = d.alerts || [];
+  const highAlerts = alerts.filter(a => a.severity === 'high');
+  const medAlerts = alerts.filter(a => a.severity === 'medium');
+
+  if (gwOffline || highAlerts.length > 0) return { level: 'red', label: 'Needs attention' };
+  if (medAlerts.length > 0) return { level: 'amber', label: 'Minor issues' };
+  return { level: 'green', label: 'All systems go' };
+}
+
+// --- Rendering ---
+function render(d) {
+  if (!d) return;
+  DATA = d;
+  lastFetchMs = Date.now();
+
+  renderHeader(d);
+  renderSystemStrip(d);
+  renderAlerts(d);
+  renderAgentGrid(d);
+  renderSchedule(d);
+  renderServices(d);
+  renderFeed(d);
+  updateTick();
+}
+
+function renderHeader(d) {
+  document.getElementById('headerEmoji').textContent = d.botEmoji || '';
+  document.getElementById('headerName').textContent = d.botName || 'Holly';
+
+  const h = computeHealth(d);
+  const pill = document.getElementById('healthPill');
+  pill.className = 'health-pill ' + h.level;
+  pill.textContent = h.label;
+}
+
+function renderSystemStrip(d) {
+  const v = d.systemVitals || {};
+  const gw = d.gateway || {};
+
+  function tempClass(t) { return t >= 85 ? 'dot-red' : t >= 70 ? 'dot-amber' : 'dot-green'; }
+  function diskClass(p) { return p >= 85 ? 'dot-red' : p >= 70 ? 'dot-amber' : 'dot-green'; }
+  function loadClass(l) { return l >= 8 ? 'dot-red' : l >= 4 ? 'dot-amber' : 'dot-green'; }
+
+  const pills = [
+    { dot: tempClass(v.cpuTemp || 0), label: (v.cpuTemp || 0) + '°C', title: 'CPU Temp' },
+    { dot: diskClass(v.diskUsedPct || 0), label: (v.diskUsedPct || 0) + '% disk', title: 'Disk Usage' },
+    { dot: loadClass(v.loadAvg || 0), label: 'Load ' + (v.loadAvg || 0).toFixed(1), title: 'Load Average' },
+    { dot: 'dot-accent', label: parseUptime(gw.uptime), title: 'Gateway Uptime' },
+  ];
+
+  document.getElementById('systemStrip').innerHTML = pills.map(p =>
+    '<div class="metric-pill" title="' + escHtml(p.title) + '">' +
+    '<span class="dot ' + p.dot + '"></span>' +
+    '<span>' + escHtml(p.label) + '</span></div>'
+  ).join('');
+}
+
+function renderAlerts(d) {
+  const alerts = d.alerts || [];
+  const banner = document.getElementById('alertBanner');
+  if (alerts.length === 0) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  banner.removeAttribute('open');
+  document.getElementById('alertSummary').innerHTML =
+    '&#9888;&#65039; ' + alerts.length + ' issue' + (alerts.length !== 1 ? 's' : '') + ' need attention';
+  document.getElementById('alertList').innerHTML = alerts.map(a =>
+    '<div class="alert-item"><span class="alert-icon">' + (a.icon || '') + '</span><span>' + escHtml(a.message) + '</span></div>'
+  ).join('');
+}
+
+function renderAgentGrid(d) {
+  const ai = d.agentIdentities || {};
+  const ac = d.agentConfig || {};
+  const agents = ac.agents || [];
+  const crons = d.crons || [];
+  const skills = d.skills || [];
+
+  // Filter: exclude bench-* and router
+  const filtered = agents.filter(a => !a.id.startsWith('bench-') && a.id !== 'router');
+
+  // Map agent config + identity
+  const cards = filtered.map(ag => {
+    const identity = ai[ag.id] || {};
+    const emoji = identity.emoji || '';
+    const name = identity.name || ag.role || ag.id;
+    const creature = identity.creature || '';
+    const tagline = identity.tagline || '';
+    const lastMs = identity.lastActivityMs || 0;
+    const isActive = lastMs && (Date.now() - lastMs < 1800000);
+    const model = ag.model || ag.modelId || '';
+
+    // Crons for this agent
+    const agentCrons = crons.filter(c => c.agentId === ag.id && c.enabled);
+    // Skills for this agent
+    const agentSkills = skills.filter(s => s.agent === ag.id);
+
+    return { id: ag.id, emoji, name, creature, tagline, lastMs, isActive, model, agentCrons, agentSkills };
+  });
+
+  // Sort: active first, then alphabetically
+  cards.sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  document.getElementById('agentGrid').innerHTML = cards.map(c => {
+    const actClass = c.isActive ? 'active' : '';
+    const actTime = c.lastMs ? timeAgo(c.lastMs) : 'idle';
+
+    // Cron rows
+    let cronHtml = '';
+    if (c.agentCrons.length > 0) {
+      cronHtml = '<div class="agent-section-label">Scheduled Jobs</div><div class="agent-cron-list">' +
+        c.agentCrons.map(cr => {
+          const dotClass = cr.lastStatus === 'error' ? 'dot-red' : cr.lastStatus === 'ok' ? 'dot-green' : 'dot-amber';
+          let ago = 'never';
+          if (cr.lastRun) {
+            try {
+              const ts = new Date(cr.lastRun.replace(' ', 'T') + ':00Z').getTime();
+              if (!isNaN(ts)) ago = timeAgo(ts);
+            } catch(e) { /* noop */ }
+          }
+          return '<div class="cron-row"><span class="dot ' + dotClass + '"></span>' +
+            '<span class="cron-name">' + escHtml(cr.name) + '</span>' +
+            '<span class="cron-ago">' + escHtml(ago) + '</span></div>';
+        }).join('') + '</div>';
+    }
+
+    // Skill pills
+    let skillHtml = '';
+    if (c.agentSkills.length > 0) {
+      skillHtml = '<div class="agent-section-label">Skills</div><div class="skill-pills">' +
+        c.agentSkills.map(s => '<span class="skill-pill">' + escHtml(s.name) + '</span>').join('') + '</div>';
+    }
+
+    return '<details class="agent-card">' +
+      '<summary>' +
+        '<div class="agent-header">' +
+          '<span class="agent-emoji">' + c.emoji + '</span>' +
+          '<div class="agent-info"><span class="agent-name">' + escHtml(c.name) + '</span></div>' +
+          '<div class="agent-activity">' +
+            '<span class="activity-dot ' + actClass + '"></span>' +
+            '<span class="activity-time">' + escHtml(actTime) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="agent-role">' + escHtml(c.creature) + '</div>' +
+      '</summary>' +
+      '<div class="agent-details">' +
+        '<div class="agent-model">' + escHtml(simplifyModel(c.model)) + '</div>' +
+        (c.tagline ? '<div class="agent-tagline">"' + escHtml(c.tagline) + '"</div>' : '') +
+        cronHtml +
+        skillHtml +
+      '</div>' +
+    '</details>';
+  }).join('');
+}
+
+function renderSchedule(d) {
+  const crons = d.crons || [];
+  // Use lastRefresh date for "today" to handle BST correctly
+  const refDate = (d.lastRefresh || '').slice(0, 10);
+  if (!refDate) {
+    document.getElementById('scheduleContainer').innerHTML = '<div class="empty-state">No schedule data</div>';
+    return;
+  }
+
+  // Collect all schedule items for today
+  const items = [];
+  for (const c of crons) {
+    if (!c.enabled) continue;
+    const entries = cronTimeForDate(c, refDate);
+    for (const e of entries) items.push(e);
+  }
+
+  // Sort by time
+  items.sort((a, b) => a.time.localeCompare(b.time));
+
+  if (items.length === 0) {
+    document.getElementById('scheduleContainer').innerHTML = '<div class="empty-state">No jobs scheduled today</div>';
+    return;
+  }
+
+  function rowHtml(item) {
+    let icon, iconClass;
+    if (item.status === 'ok') { icon = '&#10003;'; iconClass = 'done'; }
+    else if (item.status === 'error') { icon = '&#10007;'; iconClass = 'error'; }
+    else { icon = '&#9719;'; iconClass = 'upcoming'; }
+    const agent = item.agentId ? agentNameById(item.agentId) : '';
+    return '<div class="schedule-row">' +
+      '<span class="schedule-time">' + escHtml(item.time) + '</span>' +
+      '<span class="schedule-icon ' + iconClass + '">' + icon + '</span>' +
+      '<span class="schedule-name">' + escHtml(item.name) + '</span>' +
+      (agent ? '<span class="schedule-agent">' + escHtml(agent) + '</span>' : '') +
+    '</div>';
+  }
+
+  const INITIAL = 8;
+  let html = '<div class="schedule-list">';
+  const visible = items.slice(0, INITIAL);
+  const rest = items.slice(INITIAL);
+  html += visible.map(rowHtml).join('');
+  html += '</div>';
+
+  if (rest.length > 0) {
+    html += '<details id="scheduleMore"><summary class="show-all-btn">Show all (' + items.length + ')</summary>' +
+      '<div class="schedule-list">' + rest.map(rowHtml).join('') + '</div></details>';
+  }
+
+  document.getElementById('scheduleContainer').innerHTML = html;
+}
+
+function renderServices(d) {
+  const gw = d.gateway || {};
+  const mcpServers = d.mcpServers || [];
+
+  const gwOnline = gw.status === 'online';
+  const gwDotClass = gwOnline ? 'dot-green' : 'dot-red';
+  const gwDetail = gwOnline ? parseUptime(gw.uptime) : 'Offline';
+
+  const total = mcpServers.length;
+  const healthy = mcpServers.filter(s => s.status === 'ok').length;
+  const failed = mcpServers.filter(s => s.status !== 'ok');
+  let mcpDotClass = 'dot-green';
+  if (failed.length > 0 && failed.length <= 3) mcpDotClass = 'dot-amber';
+  if (failed.length > 3) mcpDotClass = 'dot-red';
+
+  let html = '<div class="service-row">' +
+    '<span class="dot ' + gwDotClass + '"></span>' +
+    '<span class="service-name">Gateway</span>' +
+    '<span class="service-detail">' + escHtml(gwDetail) + '</span></div>';
+
+  html += '<div class="service-row">' +
+    '<span class="dot ' + mcpDotClass + '"></span>' +
+    '<span class="service-name">MCP Servers</span>' +
+    '<span class="service-detail">' + healthy + '/' + total + ' healthy</span></div>';
+
+  if (failed.length > 0) {
+    html += '<div class="mcp-failures">' + failed.map(f =>
+      '<div class="mcp-fail-row"><span class="dot dot-red"></span>' + escHtml(f.name) + '</div>'
+    ).join('') + '</div>';
+  }
+
+  document.getElementById('servicesList').innerHTML = html;
+}
+
+function renderFeed(d) {
+  const feed = (d.activityFeed || []).slice(0, 10);
+  if (feed.length === 0) {
+    document.getElementById('feedContainer').innerHTML = '<div class="empty-state">No recent activity</div>';
+    return;
+  }
+
+  document.getElementById('feedContainer').innerHTML =
+    '<div class="feed-list">' + feed.map(f =>
+      '<div class="feed-row">' +
+        '<span class="feed-time">' + escHtml(f.time || '') + '</span>' +
+        '<span class="feed-icon">' + (f.icon || '') + '</span>' +
+        '<span class="feed-msg">' + escHtml(f.message || '') + '</span>' +
+      '</div>'
+    ).join('') + '</div>';
+}
+
+function updateTick() {
+  const el = document.getElementById('updatedText');
+  if (!lastFetchMs) { el.textContent = ''; return; }
+  const sec = Math.round((Date.now() - lastFetchMs) / 1000);
+  if (sec < 5) el.textContent = 'Updated just now';
+  else if (sec < 60) el.textContent = 'Updated ' + sec + 's ago';
+  else el.textContent = 'Updated ' + Math.floor(sec / 60) + 'm ago';
+}
+
+// --- Theme System ---
+async function loadThemes() {
+  try {
+    const resp = await fetch('/themes.json');
+    THEMES = await resp.json();
+    buildThemeDropdown();
+    const saved = localStorage.getItem('ocDashTheme');
+    if (saved && THEMES[saved]) applyTheme(saved);
+  } catch(e) { /* noop, fallback to root vars */ }
+}
+
+function applyTheme(key) {
+  if (!THEMES || !THEMES[key]) return;
+  const colors = THEMES[key].colors;
+  const root = document.documentElement;
+  for (const [prop, val] of Object.entries(colors)) {
+    root.style.setProperty('--' + prop, val);
+  }
+  localStorage.setItem('ocDashTheme', key);
+  // Update meta theme-color
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && colors.bg) meta.content = colors.bg;
+  // Mark active in dropdown
+  document.querySelectorAll('.theme-option').forEach(el => {
+    el.classList.toggle('active', el.dataset.key === key);
+  });
+}
+
+function buildThemeDropdown() {
+  if (!THEMES) return;
+  const dd = document.getElementById('themeDropdown');
+  const saved = localStorage.getItem('ocDashTheme') || 'midnight';
+  dd.innerHTML = Object.entries(THEMES).map(([key, t]) =>
+    '<button class="theme-option' + (key === saved ? ' active' : '') + '" data-key="' + key + '">' +
+    '<span>' + (t.icon || '') + '</span><span>' + escHtml(t.name) + '</span></button>'
+  ).join('');
+  dd.querySelectorAll('.theme-option').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applyTheme(btn.dataset.key);
+      dd.classList.remove('open');
+    });
+  });
+}
+
+// Theme dropdown toggle
+document.getElementById('themeBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('themeDropdown').classList.toggle('open');
+});
+document.addEventListener('click', () => {
+  document.getElementById('themeDropdown').classList.remove('open');
+});
+
+// --- Data Fetching ---
+async function fetchData() {
+  const header = document.getElementById('header');
+  header.classList.add('loading');
+  try {
+    const resp = await fetch('/api/refresh');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+    render(d);
+  } catch(e) {
+    console.error('Fetch failed:', e);
+  } finally {
+    header.classList.remove('loading');
+  }
+}
+
+// --- Pull to Refresh ---
+let ptrStartY = 0;
+let ptrActive = false;
+
+document.addEventListener('touchstart', (e) => {
+  if (window.scrollY === 0 && e.touches.length === 1) {
+    ptrStartY = e.touches[0].clientY;
+    ptrActive = true;
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!ptrActive) return;
+  const dy = e.touches[0].clientY - ptrStartY;
+  const indicator = document.getElementById('ptrIndicator');
+  if (dy > 30 && window.scrollY === 0) {
+    indicator.classList.add('visible');
+    if (dy > 100) indicator.textContent = 'Release to refresh...';
+    else indicator.textContent = 'Pull to refresh...';
+  } else {
+    indicator.classList.remove('visible');
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  const indicator = document.getElementById('ptrIndicator');
+  if (ptrActive && indicator.classList.contains('visible') && indicator.textContent.includes('Release')) {
+    indicator.textContent = 'Refreshing...';
+    fetchData().then(() => {
+      setTimeout(() => indicator.classList.remove('visible'), 300);
+    });
+  } else {
+    indicator.classList.remove('visible');
+  }
+  ptrActive = false;
+});
+
+// --- Init ---
+(async function init() {
+  await loadThemes();
+  await fetchData();
+
+  // Auto-refresh every 60s
+  refreshTimer = setInterval(fetchData, 60000);
+
+  // Tick counter every 5s
+  tickTimer = setInterval(updateTick, 5000);
+})();
+</script>
+</body>
+</html>
