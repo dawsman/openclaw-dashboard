@@ -963,10 +963,64 @@ if os.path.exists(cron_path):
                 'lastStatus': last_status,
                 'lastDurationMs': duration_ms,
                 'nextRun': next_run_str,
-                'model': job.get('payload', {}).get('model', '')
+                'model': job.get('payload', {}).get('model', ''),
+                'agentId': job.get('agentId', ''),
             })
     except Exception as _e:
         import sys; print(f"[dashboard warn] {_e}", file=sys.stderr)
+
+# ── Agent identities (from IDENTITY.md files) ──
+agent_identities = {}
+_identity_agent_ids = set()
+for _ag in agent_config.get('agents', []):
+    _identity_agent_ids.add(_ag.get('id', ''))
+# Ensure main is always included
+_identity_agent_ids.add('main')
+
+for _aid in sorted(_identity_agent_ids):
+    if not _aid:
+        continue
+    if _aid == 'main':
+        _id_path = os.path.join(openclaw_path, 'workspace', 'IDENTITY.md')
+    else:
+        _id_path = os.path.join(openclaw_path, 'workspaces', _aid, 'IDENTITY.md')
+    _identity = {}
+    if os.path.exists(_id_path):
+        try:
+            with open(_id_path) as _f:
+                _id_lines = _f.readlines()
+            _field_map = {'name': 'Name', 'creature': 'Creature', 'emoji': 'Emoji', 'vibe': 'Vibe'}
+            for _line in _id_lines:
+                for _key, _label in _field_map.items():
+                    _pat = f'- **{_label}:**'
+                    if _pat in _line:
+                        _identity[_key] = _line.split(_pat, 1)[1].strip()
+            # Tagline: first non-empty line after ---
+            _found_hr = False
+            for _line in _id_lines:
+                if _line.strip() == '---':
+                    _found_hr = True
+                    continue
+                if _found_hr and _line.strip():
+                    _identity['tagline'] = _line.strip()
+                    break
+        except Exception as _e:
+            import sys; print(f"[dashboard warn] IDENTITY.md {_aid}: {_e}", file=sys.stderr)
+
+    # Last activity: most recently modified .jsonl in agent sessions dir
+    _sessions_dir = os.path.join(openclaw_path, 'agents', _aid, 'sessions')
+    _last_activity_ms = 0
+    if os.path.isdir(_sessions_dir):
+        for _jf in glob.glob(os.path.join(_sessions_dir, '*.jsonl')):
+            try:
+                _mt = os.path.getmtime(_jf)
+                _mt_ms = int(_mt * 1000)
+                if _mt_ms > _last_activity_ms:
+                    _last_activity_ms = _mt_ms
+            except OSError:
+                pass
+    _identity['lastActivityMs'] = _last_activity_ms
+    agent_identities[_aid] = _identity
 
 # ── Token usage from JSONL ──
 def model_name(model):
@@ -1376,6 +1430,7 @@ output = {
     # Models & skills
     'availableModels': available_models,
     'agentConfig': agent_config,
+    'agentIdentities': agent_identities,
     'skills': skills,
 
     # MCP Servers
