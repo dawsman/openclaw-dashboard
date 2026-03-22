@@ -203,6 +203,7 @@ body {
 .dot-amber { background: var(--yellow); }
 .dot-red { background: var(--red); }
 .dot-accent { background: var(--accent); }
+.dot-dim { background: var(--dim); }
 
 /* === 3. Alert Banner === */
 .alert-banner {
@@ -315,7 +316,11 @@ body {
 /* Agent expanded content */
 .agent-details {
   padding: 0 12px 12px;
-  animation: fade-in 0.2s ease;
+  animation: slideDown 0.2s ease-out;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .agent-model {
   font-size: 0.7rem;
@@ -757,6 +762,11 @@ function renderAgentGrid(d) {
     return a.name.localeCompare(b.name);
   });
 
+  if (cards.length === 0) {
+    document.getElementById('agentGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:24px">No agents configured</div>';
+    return;
+  }
+
   document.getElementById('agentGrid').innerHTML = cards.map(c => {
     const actClass = c.isActive ? 'active' : '';
     const actTime = c.lastMs ? timeAgo(c.lastMs) : 'idle';
@@ -766,7 +776,7 @@ function renderAgentGrid(d) {
     if (c.agentCrons.length > 0) {
       cronHtml = '<div class="agent-section-label">Scheduled Jobs</div><div class="agent-cron-list">' +
         c.agentCrons.map(cr => {
-          const dotClass = cr.lastStatus === 'error' ? 'dot-red' : cr.lastStatus === 'ok' ? 'dot-green' : 'dot-amber';
+          const dotClass = cr.lastStatus === 'error' ? 'dot-red' : cr.lastStatus === 'ok' ? 'dot-green' : 'dot-dim';
           let ago = 'never';
           if (cr.lastRun) {
             try {
