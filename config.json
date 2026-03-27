@@ -16,7 +16,8 @@
     "crons": true,
     "subagentRuns": true,
     "skills": true,
-    "actions": true
+    "actions": true,
+    "timers": true
   },
   "refresh": {
     "intervalSeconds": 30,

@@ -1444,6 +1444,66 @@ output = {
 
 }
 
+# ── System Timers ──────────────────────────────────────────────────
+import subprocess as _sp
+
+def _get_timer_status():
+    """Query all user systemd timers and return structured data."""
+    timers = []
+    try:
+        raw = _sp.check_output(
+            ['systemctl', '--user', 'list-timers', '--all', '--no-pager', '--no-legend'],
+            text=True, timeout=10
+        ).strip()
+        for line in raw.split('\n'):
+            if not line.strip():
+                continue
+            parts = line.split()
+            timer_name = None
+            service_name = None
+            for p in parts:
+                if p.endswith('.timer'):
+                    timer_name = p
+                elif p.endswith('.service'):
+                    service_name = p
+            if not timer_name:
+                continue
+            svc = service_name or timer_name.replace('.timer', '.service')
+            try:
+                result = _sp.check_output(
+                    ['systemctl', '--user', 'show', svc,
+                     '--property=ActiveState,ExecMainStatus,ExecMainStartTimestamp,ExecMainExitTimestamp,Description'],
+                    text=True, timeout=5
+                ).strip()
+                props = dict(l.split('=', 1) for l in result.split('\n') if '=' in l)
+            except Exception:
+                props = {}
+            try:
+                next_raw = _sp.check_output(
+                    ['systemctl', '--user', 'show', timer_name, '--property=NextElapseUSecRealtime'],
+                    text=True, timeout=5
+                ).strip()
+                next_time = next_raw.split('=', 1)[1] if '=' in next_raw else ''
+            except Exception:
+                next_time = ''
+            timers.append({
+                'name': timer_name.replace('.timer', ''),
+                'timer': timer_name,
+                'service': svc,
+                'description': props.get('Description', ''),
+                'lastExitCode': int(props.get('ExecMainStatus', '-1')),
+                'lastStart': props.get('ExecMainStartTimestamp', ''),
+                'lastEnd': props.get('ExecMainExitTimestamp', ''),
+                'state': props.get('ActiveState', 'unknown'),
+                'nextRun': next_time,
+                'healthy': int(props.get('ExecMainStatus', '1')) == 0,
+            })
+    except Exception as e:
+        timers = [{'error': str(e)}]
+    return timers
+
+output['timers'] = _get_timer_status()
+
 print(json.dumps(output, indent=2))
 PYEOF
 
